@@ -481,3 +481,52 @@ To build your own resource, define your own configuration and build a controller
    ![Kustomize](images/kustomize.png)
 2. Helm: uses a templating model. A configuration file for each environment. Has "hooks" which allow encoding dependencies. Its limitations are with the un-readable templates at a large scale, boilerplate configuration, and CRD management is limited.
 3. Kluctl: uses a templating model. Also has hooks. Integrates with helm and kustomize. Includes a built in GitOps engine. Great choice for deploying to multiple environments, but requires slightly more setup.
+
+#### Cluster/Node Upgrades
+
+**Upgrade Process:**
+
+1. `Check for usage of deprecated APIs`: If you are using deprecated APIs that will be removed by a Kubernetes upgrade, you need to address those before upgrading. One tool that automatically checks this is [kubent](https://github.com/doitintl/kube-no-trouble).
+
+2. `Update the control plane`: The control plane version can be ahead of the worker nodes, but cannot be behind so it is updated first.
+
+3. `Create a new nodepool`: Rather than update nodes in place, it can be safer to create a new node group. This way the new nodes will be fully operational before you shift workloads to them and if something goes wrong you can shift the workloads back to the old nodes.
+
+4. `Drain and cordon the old nodes`: You can use kubernetes scheduling capabilities to shift all of the pods onto the newly provisioned nodes.
+
+5. `Delete the old nodepool`: Once all of the workloads are successfully running on the new nodes, you can safely delete the old nodes.
+
+_Note: managed clusters may not give the perms to follow the above process, to which you will have to upgrade in place. Some people also prefer to deploy entirely new clusters rather than upgrading (depending on the amount of state in the cluster)._
+
+#### CI/CD
+
+##### Deployment Strategies
+
+- Level -1: kubectl create (imperative).
+- Level 0: kubectl apply manually (declarative).
+- Level 1: kubectl apply from pipeline (automated).
+- Level 2: GitOps (continuous).
+
+##### Continuous Integration
+
+- Run linting, tests, validation.
+- Build and push container images.
+
+Both of these are easily done via Github Actions.
+
+[**Sample Github Actions CI Workflow**](workflows/image-ci.yml)
+
+This workflow builds and pushes Docker images (CI), while updating image tags in Kubernetes manifests for CD.
+
+##### Continuous Delivery
+
+- Update Kubernetes manifests using Github Actions.
+
+- Apply updated manifests to cluster(s) using kluctl GitOps (or other CD tools like ArgoCD).
+
+  Kluctl GitOps architecture:
+  ![Kluctl](images/kluctl_gitops.png)
+
+- Validate deployments worked as expected.
+
+**End of DevOps Directive Kubernetes Course!**
