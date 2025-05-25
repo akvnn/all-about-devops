@@ -1,25 +1,57 @@
+## DevOps Notes (Cheatsheet)
+
+These notes are meant to be coupled with a practical component and serve merely as the theoritical reference. These notes combine various technical blogs, courses, and books. All references have been included.
+
+_Have fun.. and remember, do not get stuck in tutorial hell :)_
+
 ### DevOps
 
-DevOps is a set of practices and a cultural philosophy that aims to unify software development (Dev) and IT operations (Ops). It emphasizes collaboration, automation, and continuous feedback throughout the software delivery lifecycle. By breaking down traditional silos between development and operations teams, DevOps enables organizations to deliver applications and services more rapidly, reliably, and efficiently. Key principles include continuous integration, continuous delivery, infrastructure as code, monitoring, and rapid response to change, all of which help improve product quality and accelerate time to market.
-
-### DevOps
 #### What is DevOps?
 
 DevOps is a collaborative culture and set of practices that unify software development (Dev) and IT operations (Ops). It emphasizes automation, continuous feedback, and shared ownership to accelerate software delivery, improve reliability, and foster agility. By breaking down silos between teams, DevOps enables organizations to ship high-quality code faster and respond to market changes effectively.
 
 #### Key DevOps Operations
 
-| **Operation**              | **Description**                                                                 | **Examples**                       |  
-|----------------------------|---------------------------------------------------------------------------------|-------------------------------------|  
-| **Continuous Integration (CI)** | Automate building and testing code changes to catch issues early.              | Jenkins, GitHub Actions, GitLab CI |  
-| **Continuous Delivery (CD)**   | Automate deployments to staging/production environments after CI passes.       | ArgoCD, Spinnaker, AWS CodeDeploy  |  
-| **Infrastructure as Code (IaC)** | Define and manage infrastructure (servers, networks) using declarative code.   | Terraform, AWS CloudFormation      |  
-| **Monitoring & Observability**  | Track system health, logs, and metrics in real-time to detect anomalies.       | Prometheus, Grafana, Datadog       |  
-| **Incident Management**        | Respond to and resolve outages with tools for alerts, collaboration, and RCA.  | PagerDuty, Opsgenie, Jira Service Management |  
-| **Security (DevSecOps)**       | Integrate security checks into pipelines to identify vulnerabilities early.    | Snyk, SonarQube, HashiCorp Vault   |  
-| **Configuration Management**   | Automate server/application configuration to ensure consistency.               | Ansible, Chef, Puppet              |
+| **Operation**                    | **Description**                                                               | **Examples**                                 |
+| -------------------------------- | ----------------------------------------------------------------------------- | -------------------------------------------- |
+| **Continuous Integration (CI)**  | Automate building and testing code changes to catch issues early.             | Jenkins, GitHub Actions, GitLab CI           |
+| **Continuous Delivery (CD)**     | Automate deployments to staging/production environments after CI passes.      | ArgoCD, Spinnaker, AWS CodeDeploy            |
+| **Infrastructure as Code (IaC)** | Define and manage infrastructure (servers, networks) using declarative code.  | Terraform, AWS CloudFormation                |
+| **Monitoring & Observability**   | Track system health, logs, and metrics in real-time to detect anomalies.      | Prometheus, Grafana, Datadog                 |
+| **Incident Management**          | Respond to and resolve outages with tools for alerts, collaboration, and RCA. | PagerDuty, Opsgenie, Jira Service Management |
+| **Security (DevSecOps)**         | Integrate security checks into pipelines to identify vulnerabilities early.   | Snyk, SonarQube, HashiCorp Vault             |
+| **Configuration Management**     | Automate server/application configuration to ensure consistency.              | Ansible, Chef, Puppet                        |
+
+### Containers ([reference](https://courses.devopsdirective.com/docker-beginner-to-pro))
+
+#### What is a Container?
+
+A Docker container image is a lightweight, standalone, executable package of software that includes everything needed to run an application. This package contains:
+
+- Underlying OS dependencies
+- Runtime dependencies (e.g., Python runtime)
+- Libraries (e.g., SQL Alchemy, FastAPI)
+- Application code
+  Containers leverage three linux features to work their magic:
+
+Docker is a specific implementation of the Open Container Initiative (OCI) standard that aims to create open standards for container formats. When referring to Docker images or Docker container images, it means the Docker implementation of the OCI specification.
+
+#### Containers' Building Blocks
+
+1. cgroups: are a Linux kernel feature which allow processes to be organized into hierarchical groups whose usage of various types of resources (e.g., CPU, memory, etc) can then be limited and monitored.
+
+2. namespaces: wraps a global system resource in an abstraction that makes it appear to the processes within the namespace that they have their own isolated instance of the global resource. Changes to the global resource are visible to other processes that are members of the namespace, but are invisible to other processes.
+
+3. union fileystems: allows files and directories of separate file systems, known as branches, to be transparently overlaid, forming a single coherent file system.
+
+Contents of directories which have the same path within the merged branches will be seen together in a single merged directory, within the new, virtual filesystem.
+
+This approach allows for efficient use of space because common layers can be shared. For example, if multiple containers from the same image are created on a single host, the container runtime only has to allocate a thin overlay specific to each container, while the underlying image layers can be shared. More detail on understanding the implications of these filesystem on data persistence can be found in 04-using-3rd-party-containers.
+
+![Union File System](images/ufs.png)
 
 ### Github Actions
+
 #### What is Github Actions?
 
 GitHub Actions are packaged scripts to automate tasks in a software-development workflow in GitHub. You can configure GitHub Actions to trigger complex workflows that meet your organization's needs. The trigger can happen each time developers check new source code into a specific branch, at timed intervals, or manually. The result is a reliable and sustainable automated workflow, which leads to a significant decrease in development time.
@@ -66,13 +98,15 @@ The actions inside your workflow are the standalone commands that are executed. 
 In addition to default environment variables, you can use defined variables as contexts. Contexts and default variables are similar in that they both provide access to environment information, but they have some important differences. While default environment variables can only be used within the runner, context variables can be used at any point within the workflow. For example, context variables allow you to run an if statement to evaluate an expression before the runner is executed.
 
 #### Some Important Actions
+
 1. actions/checkout:
-    - Clones your repository to the GitHub Actions runner.
-    - Checks out the specified ref (branch, tag, SHA).
-    - Sets up Git credentials for subsequent Git operations.
-    - Configures the Git environment for the workflow.
+   - Clones your repository to the GitHub Actions runner.
+   - Checks out the specified ref (branch, tag, SHA).
+   - Sets up Git credentials for subsequent Git operations.
+   - Configures the Git environment for the workflow.
 
 ### GitOps
+
 #### What is GitOps?
 
 GitOps is a way to do Kubernetes cluster management and application delivery. It works by using Git as a single source of truth for declarative infrastructure and applications (i.e., infrastructure as code), together with tools ensuring the actual state of infrastructure and applications converges towards the desired state declared in Git. With Git at the center of your delivery pipelines, developers can make pull requests to accelerate and simplify application deployments and operations tasks to your infrastructure or container-orchestration system (e.g. Kubernetes).
@@ -81,29 +115,29 @@ GitOps is a way to do Kubernetes cluster management and application delivery. It
 
 The core idea of GitOps is having a Git repository that always contains declarative descriptions of the infrastructure currently desired in the production environment and an automated process to make the production environment match the described state in the repository. If you want to deploy a new application or update an existing one, you only need to update the repository - the automated process handles everything else. It’s like having cruise control for managing your applications in production.
 
-*GitOps: versioned CI/CD on top of declarative infrastructure. Stop scripting and start shipping.* - Kelsey Hightower
+_GitOps: versioned CI/CD on top of declarative infrastructure. Stop scripting and start shipping._ - Kelsey Hightower
 
-*GitOps is a subset of DevOps: GitOps implements DevOps principles (automation, collaboration) but focuses specifically on deployment workflows. - Deepseek R1*
+_GitOps is a subset of DevOps: GitOps implements DevOps principles (automation, collaboration) but focuses specifically on deployment workflows. - Deepseek R1_
 
 #### Perks of using GitOps
 
-*High Velocity Deployments*: What is unique about GitOps is that you don’t have to switch tools for deploying your application. Everything happens in the version control system you use for developing the application anyways.
+_High Velocity Deployments_: What is unique about GitOps is that you don’t have to switch tools for deploying your application. Everything happens in the version control system you use for developing the application anyways.
 
-*Easy and Fast Error Recovery*: With GitOps you have a complete history of how your environment changed over time. This makes error recovery as easy as issuing a `git revert` and watching your environment being restored.
+_Easy and Fast Error Recovery_: With GitOps you have a complete history of how your environment changed over time. This makes error recovery as easy as issuing a `git revert` and watching your environment being restored.
 
-*The Git record is then not just an audit log but also a transaction log. You can roll back & forth to any snapshot.* - Alexis Richardson
+_The Git record is then not just an audit log but also a transaction log. You can roll back & forth to any snapshot._ - Alexis Richardson
 
-*Easier Credential Management*: GitOps allows you to manage deployments completely from inside your environment. For that, your environment only needs access to your repository and image registry. That’s it. You don’t have to give your developers direct access to the environment.
+_Easier Credential Management_: GitOps allows you to manage deployments completely from inside your environment. For that, your environment only needs access to your repository and image registry. That’s it. You don’t have to give your developers direct access to the environment.
 
-*Self-documenting Deployments*: Have you ever SSH’d into a server and wondered what’s running there? With GitOps, every change to any environment must happen through the repository. You can always check out the master branch and get a complete description of what is deployed where plus the complete history of every change ever made to the system. And you get an audit trail of any changes in your system for free!
+_Self-documenting Deployments_: Have you ever SSH’d into a server and wondered what’s running there? With GitOps, every change to any environment must happen through the repository. You can always check out the master branch and get a complete description of what is deployed where plus the complete history of every change ever made to the system. And you get an audit trail of any changes in your system for free!
 
-*Shared Knowledge*: Using Git to store complete descriptions of your deployed infrastructure allows everybody in your team to check out its evolution over time. With great commit messages everybody can reproduce the thought process of changing infrastructure and also easily find examples of how to set up new systems.
+_Shared Knowledge_: Using Git to store complete descriptions of your deployed infrastructure allows everybody in your team to check out its evolution over time. With great commit messages everybody can reproduce the thought process of changing infrastructure and also easily find examples of how to set up new systems.
 
 #### How does GitOps work?
 
-*Environment Configurations as Git repository*: GitOps organizes the deployment process around code repositories as the central element. There are at least two repositories: the application repository and the environment configuration repository. The application repository contains the source code of the application and the deployment manifests to deploy the application. The environment configuration repository contains all deployment manifests of the currently desired infrastructure of an deployment environment. It describes what applications and infrastructural services (message broker, service mesh, monitoring tool, …) should run with what configuration and version in the deployment environment.
+_Environment Configurations as Git repository_: GitOps organizes the deployment process around code repositories as the central element. There are at least two repositories: the application repository and the environment configuration repository. The application repository contains the source code of the application and the deployment manifests to deploy the application. The environment configuration repository contains all deployment manifests of the currently desired infrastructure of an deployment environment. It describes what applications and infrastructural services (message broker, service mesh, monitoring tool, …) should run with what configuration and version in the deployment environment.
 
-*Push-based vs. Pull-based Deployments*: There are two ways to implement the deployment strategy for GitOps: Push-based and Pull-based deployments. The difference between the two deployment types is how it is ensured, that the deployment environment actually resembles the desired infrastructure. When possible, the Pull-based approach should be preferred as it is considered the more secure and thus better practice to implement GitOps.
+_Push-based vs. Pull-based Deployments_: There are two ways to implement the deployment strategy for GitOps: Push-based and Pull-based deployments. The difference between the two deployment types is how it is ensured, that the deployment environment actually resembles the desired infrastructure. When possible, the Pull-based approach should be preferred as it is considered the more secure and thus better practice to implement GitOps.
 
 The Push-based deployment strategy is implemented by popular CI/CD tools such as Jenkins, CircleCI, or Travis CI. The source code of the application lives inside the application repository along with the Kubernetes YAMLs needed to deploy the app. Whenever the application code is updated, the build pipeline is triggered, which builds the container images and finally the environment configuration repository is updated with new deployment descriptors.
 
@@ -141,13 +175,12 @@ That being said, you have secrets created within the environment which never lea
 
 Another approach is to add a private key once to the environment (probably by someone from a dedicated ops team) and from that point you can add secrets encrypted by the public key to the environment repository. There’s even tool support for such sealed secrets in the K8s ecosystem.
 
-*There are no GitOps engineers. GitOps is not a role (and neither is DevOps). GitOps is a set of practices. You can look for a developer who has experience practicing GitOps — or simply let your developers try out those practices.*
+_There are no GitOps engineers. GitOps is not a role (and neither is DevOps). GitOps is a set of practices. You can look for a developer who has experience practicing GitOps — or simply let your developers try out those practices._
 
 #### GitOps References
 
- - https://github.com/weaveworks/awesome-gitops
- - https://www.gitops.tech/
- 
+- https://github.com/weaveworks/awesome-gitops
+- https://www.gitops.tech/
 
 ### GitOps Cookbook ([link](https://developers.redhat.com/e-books/gitops-cookbook))
 
@@ -159,24 +192,23 @@ GitOps is a methodology and practice that uses Git repositories as a single sour
 CI/CD pipelines are one of the most common use cases for GitOps.
 
 The three main pillars of GitOps are:
- - Git is the single source of truth
- - Treat everything as code
- - Operations are performed through Git workflows
 
+- Git is the single source of truth
+- Treat everything as code
+- Operations are performed through Git workflows
 
 **Some Terms:**
 
-*Declarative*: A system managed by GitOps must have its desired state expressed declaratively.
-*Versioned and immutable*: The desired state is stored in a way that enforces immutability and versioning and retains a complete version history.
-*Pulled automatically*: Software agents automatically pull the desired state declarations from the source.
-*Continuously reconciled*: Software agents continuously observe the actual system state and attempt to apply the desired state.
-
+_Declarative_: A system managed by GitOps must have its desired state expressed declaratively.
+_Versioned and immutable_: The desired state is stored in a way that enforces immutability and versioning and retains a complete version history.
+_Pulled automatically_: Software agents automatically pull the desired state declarations from the source.
+_Continuously reconciled_: Software agents continuously observe the actual system state and attempt to apply the desired state.
 
 #### Kubernetes CICD
 
 In a typical CI/CD pipeline, submitted code checks the CI process while the CD process checks and applies requirements for things like security, infrastructure as code, or any other boundaries set for the application framework. All code changes are tracked, making updates easy while also providing version control should a rollback be needed. CD is the GitOps domain and it works together with the CI part to deploy apps in multiple environments.
 
-With Kubernetes, it’s easy to implement an in-cluster CI/CD pipeline. You can have CI software create the container image representing your application and store it in a container image registry. Afterward, a Git workflow such as a pull request can change the Kubernetes manifests illustrating the deployment of your apps and start a CD sync loop. 
+With Kubernetes, it’s easy to implement an in-cluster CI/CD pipeline. You can have CI software create the container image representing your application and store it in a container image registry. Afterward, a Git workflow such as a pull request can change the Kubernetes manifests illustrating the deployment of your apps and start a CD sync loop.
 
 ![Model Diagram](images/model.png)
 
@@ -186,18 +218,17 @@ As GitOps is an agnostic, platform-independent approach, the application deploym
 GitOps tool can use Kubernetes just as a target platform for deploying apps. At the same time, in-cluster approaches run a GitOps engine inside Kubernetes to deploy apps and sync manifests in one or more Kubernetes clusters.
 
 The GitOps engine takes care of the CD part of the CI/CD pipeline and accomplishes
-*Deploy*: Deploy the manifests from Git.
+_Deploy_: Deploy the manifests from Git.
 
-*Monitor*: Monitor either the Git repo or the cluster state.
+_Monitor_: Monitor either the Git repo or the cluster state.
 
+_Detect Drift_: Detect any change from what is described in Git and what is present in the cluster.
 
-*Detect Drift*: Detect any change from what is described in Git and what is present in the cluster.
-
-*Take Action*: Perform an action that reflects what is on Git (rollback or three-way diff). Git is the source of truth, and any change is performed via a Git workflow.
+_Take Action_: Perform an action that reflects what is on Git (rollback or three-way diff). Git is the source of truth, and any change is performed via a Git workflow.
 
 ![GitOps Loop](images/loop.png)
 
-*Cultural Change in IT Organizations Needed*: The “Teaching Elephants to Dance (and Fly!)” speech from Burr Sutter gives a clear idea of the context. The elephant is where your organization is today. There are phases of change between traditional and modern environments powered by GitOps
+_Cultural Change in IT Organizations Needed_: The “Teaching Elephants to Dance (and Fly!)” speech from Burr Sutter gives a clear idea of the context. The elephant is where your organization is today. There are phases of change between traditional and modern environments powered by GitOps
 tools. Some organizations have the luxury of starting from scratch, but for many
 businesses, the challenge is teaching their lumbering elephant to dance like a graceful
 ballerina.
@@ -219,17 +250,17 @@ kaniko is another dockerless solution to build container images from a Dockerfil
 Some key concepts in Shipwright, which are defined using Kubernetes Custom Resource Definitions (CRDs). Each CRD represents a specific part of the build process (defined with a unique yaml file):
 
 1. ClusterBuildStrategy
-    - What it is: This defines how the build will be executed. It specifies the steps and tools to use for building a container image.
-    - Example: You might use a ClusterBuildStrategy for tools like Kaniko, Buildah, or Cloud Native Buildpacks. It describes the process of building an image, such as which Dockerfile to use, what commands to run, and how to push the image to a registry.
-    - Scope: It is cluster-wide, meaning it can be used by builds in any namespace.
+   - What it is: This defines how the build will be executed. It specifies the steps and tools to use for building a container image.
+   - Example: You might use a ClusterBuildStrategy for tools like Kaniko, Buildah, or Cloud Native Buildpacks. It describes the process of building an image, such as which Dockerfile to use, what commands to run, and how to push the image to a registry.
+   - Scope: It is cluster-wide, meaning it can be used by builds in any namespace.
 2. Build
-    - What it is: This defines what to build and where to push the resulting container image. It references a ClusterBuildStrategy to specify how the build should be executed.
-    - Key Details: Specifies the source code (e.g., a Git repository). Specifies the output image (e.g., the container registry and image name). Links to a ClusterBuildStrategy to define the build process.
-    - Example: A Build object might say, "Take the code from this Git repository, use the Kaniko strategy, and push the resulting image to Docker Hub."
+   - What it is: This defines what to build and where to push the resulting container image. It references a ClusterBuildStrategy to specify how the build should be executed.
+   - Key Details: Specifies the source code (e.g., a Git repository). Specifies the output image (e.g., the container registry and image name). Links to a ClusterBuildStrategy to define the build process.
+   - Example: A Build object might say, "Take the code from this Git repository, use the Kaniko strategy, and push the resulting image to Docker Hub."
 3. BuildRun
-    - What it is: This represents the actual execution of a build. When you create a BuildRun object, it triggers the build process defined in the Build object.
-    - Key Details: It uses the Build object as a template. It creates a Kubernetes Pod to execute the build process. Once the BuildRun is complete, the container image is pushed to the specified registry.
-    - Example: A BuildRun object might say, "Run the build defined in the Build object named my-app-build."
+   - What it is: This represents the actual execution of a build. When you create a BuildRun object, it triggers the build process defined in the Build object.
+   - Key Details: It uses the Build object as a template. It creates a Kubernetes Pod to execute the build process. Once the BuildRun is complete, the container image is pushed to the specified registry.
+   - Example: A BuildRun object might say, "Run the build defined in the Build object named my-app-build."
 
 #### Chapter 4: Kustomize
 
@@ -239,15 +270,16 @@ The hard part is developing the initial YAML files version; after that, usually,
 
 For this reason, some tools let you define base Kubernetes manifests (which change infrequently) and specific files (maybe one for each environment) for setting the parameters that change more frequently. One of these tools is Kustomize.
 
-
 ### DevOps Directive Kubernetes Course ([link](https://youtu.be/2T86xAtR6Fo?si=FrIHT84JCSGWPfY6))
 
 #### Terminologies
+
 **Clusters**: a set of machines (physical or virtual) that work together to run containerized applications. It consists of at least one control plane (master node) and multiple worker nodes.
 
-**Nodes**: a single machine (physical or virtual) in a Kubernetes cluster. Nodes are responsible for running the workloads (pods and containers). There are two types of nodes: 
- - Control Plane Node (Master Node): Manages the cluster, schedules workloads, and maintains the desired state of the system.
- - Worker Node: Executes the workloads (pods and containers). Each worker node has a kubelet (agent) that communicates with the control plane.
+**Nodes**: a single machine (physical or virtual) in a Kubernetes cluster. Nodes are responsible for running the workloads (pods and containers). There are two types of nodes:
+
+- Control Plane Node (Master Node): Manages the cluster, schedules workloads, and maintains the desired state of the system.
+- Worker Node: Executes the workloads (pods and containers). Each worker node has a kubelet (agent) that communicates with the control plane.
 
 **Namespaces**: a logical partition within a Kubernetes cluster. It is used to organize and isolate resources (like pods, services, and deployments) within the cluster. Namespaces are particularly useful in multi-tenant environments, where different teams or projects share the same cluster but need resource isolation.
 
@@ -278,67 +310,69 @@ Data Plane: A subset of nodes in the cluster dedicated to running user worklods.
 ![Kubernetes System Components](images/kubernetes_system.png)
 Kubernetes is comprised of many smaller components:
 
- - etcd: Key-value store used for storing all cluster data. It serves as the source of truth for the cluster state and configuration.
+- etcd: Key-value store used for storing all cluster data. It serves as the source of truth for the cluster state and configuration.
 
- - kube-apiserver: The front end for the Kubernetes control plane.
+- kube-apiserver: The front end for the Kubernetes control plane.
 
- - kube-scheduler: Schedules pods onto the appropriate nodes based on resource availability and other constraints.
+- kube-scheduler: Schedules pods onto the appropriate nodes based on resource availability and other constraints.
 
- - kube-controller-manager: Runs controller processes. Each controller is a separate process that manages routine tasks such as maintaining the desired state of resources, managing replication, handling node operations, etc...
+- kube-controller-manager: Runs controller processes. Each controller is a separate process that manages routine tasks such as maintaining the desired state of resources, managing replication, handling node operations, etc...
 
- - cloud-controller-manager: Integrates with the underlying cloud provider (if running in one) to manage cloud-specific resources. It handles tasks such as managing load balancers, storage, and networking.
+- cloud-controller-manager: Integrates with the underlying cloud provider (if running in one) to manage cloud-specific resources. It handles tasks such as managing load balancers, storage, and networking.
 
- - kubelet: An agent that runs on each worker node and ensures that containers are running in pods and manages the lifecycle of containers.
+- kubelet: An agent that runs on each worker node and ensures that containers are running in pods and manages the lifecycle of containers.
 
- - kube-proxy: This network proxy runs on each node and maintains network rules to allow communication to and from pods (not a necessity, other networking mechanisms exist).
+- kube-proxy: This network proxy runs on each node and maintains network rules to allow communication to and from pods (not a necessity, other networking mechanisms exist).
 
- - Interfaces: Container Runtime Interface (CRI), Container Network Interface (CNI), Container Storage Interface (CSI). Defining these interfaces allows for a modular system where innovation can happen outside of the main Kubernetes project and be easily “plugged in” or swapped to achieve new functionality.
-    - CRI: Standard interface that Kubernetes uses to exeucte and run container processes within the system (e.g., container d, cri-o). Docker is no longer compatible. 
-    - CNI: Defines how networking should be set up for the containers running within Kubernetes. Many different ones exist. Not all of them uses kube-proxy.
-    - CSI: Interface to provide storage to containers through drivers (e.g., cloud specific driver, cert manager driver, secrets store driver). 
+- Interfaces: Container Runtime Interface (CRI), Container Network Interface (CNI), Container Storage Interface (CSI). Defining these interfaces allows for a modular system where innovation can happen outside of the main Kubernetes project and be easily “plugged in” or swapped to achieve new functionality.
+  - CRI: Standard interface that Kubernetes uses to exeucte and run container processes within the system (e.g., container d, cri-o). Docker is no longer compatible.
+  - CNI: Defines how networking should be set up for the containers running within Kubernetes. Many different ones exist. Not all of them uses kube-proxy.
+  - CSI: Interface to provide storage to containers through drivers (e.g., cloud specific driver, cert manager driver, secrets store driver).
 
 Kubernetes uses Docker images (OCI-compliant container images) as the standardized packaging format, but runs them through container runtimes like containerd or CRI-O that implement the Container Runtime Interface (CRI). This separation allows Kubernetes to support multiple runtime implementations while maintaining compatibility with the widely-adopted Docker image format.
 
 [CNCF Landscape](https://landscape.cncf.io/) -> A website to find all the tools that are out there
 
 #### Setup Tools
- - DevBox: Devbox is a command-line tool developed by Jetpack.io that creates isolated, reproducible development environments. It allows developers to specify and manage development dependencies using a simple configuration file.
- - KinD: simple local cluster for development. Supports multiple nodes where each node is a container.
- - Civo: managed cluster platform.
- - GKE: Google's Kubernetes Engine for a recommended managed cluster experience. Two modes: standard and autopilot. Google manages control plane in both but autopilot abstracts more details.
 
-  ![Kubectl commands](images/kubectl.png)
+- DevBox: Devbox is a command-line tool developed by Jetpack.io that creates isolated, reproducible development environments. It allows developers to specify and manage development dependencies using a simple configuration file.
+- KinD: simple local cluster for development. Supports multiple nodes where each node is a container.
+- Civo: managed cluster platform.
+- GKE: Google's Kubernetes Engine for a recommended managed cluster experience. Two modes: standard and autopilot. Google manages control plane in both but autopilot abstracts more details.
 
- #### Built-in Kubernetes Resources
-  - Namespace: provides a mechanism to logically group resources within a cluster. There are four initial namespaces: default, kube-system, kube-node-lease, kube-public.
+![Kubectl commands](images/kubectl.png)
+
+#### Built-in Kubernetes Resources
+
+- Namespace: provides a mechanism to logically group resources within a cluster. There are four initial namespaces: default, kube-system, kube-node-lease, kube-public.
   By default, namespaces DO NOT act as a network/security boundary.
-  - Pods: the smallest deployable unit in Kubernetes. You almost never create a pod directly. Containers within a pod share networking and storage. Usually primary container, init containers (ran before primary container is run), and sidecar containers (run alongside primary container in perpetuity). To investigate a pod: `kubectl logs some-pod`. `kubectl get pods -o wide`
-      Pod -> ReplicaSet -> Deployment -> StatefulSet.
-  - ReplicaSet: creates replica instances of the pods at all time. labels are the link between ReplicaSet and Pods.
-  - Deployment: adds the concept of rollouts and rollbacks to ReplicaSet. Used for long-running stateless applications.
-  - Service: an internal load balancer across replicas. It routes network traffic. Uses pod labels to determine which pods to serve. Types: ClusterIP (internal), NodePort (listens on each node in cluster), LoadBalancer (provisions external load balancer with cloud provider)
-  
-  ![Services](images/service.png)
+- Pods: the smallest deployable unit in Kubernetes. You almost never create a pod directly. Containers within a pod share networking and storage. Usually primary container, init containers (ran before primary container is run), and sidecar containers (run alongside primary container in perpetuity). To investigate a pod: `kubectl logs some-pod`. `kubectl get pods -o wide`
+  Pod -> ReplicaSet -> Deployment -> StatefulSet.
+- ReplicaSet: creates replica instances of the pods at all time. labels are the link between ReplicaSet and Pods.
+- Deployment: adds the concept of rollouts and rollbacks to ReplicaSet. Used for long-running stateless applications.
+- Service: an internal load balancer across replicas. It routes network traffic. Uses pod labels to determine which pods to serve. Types: ClusterIP (internal), NodePort (listens on each node in cluster), LoadBalancer (provisions external load balancer with cloud provider)
 
-  - Jobs: pods with completion tracking. Adds ability to retry pods. To investigate a job: `kubectl describe job some-job`
-  - CronJobs: scheduled jobs. [How the schedule string works](https://crontab.guru).
-  - DaemonSet: runs a copy of the specific pod on all (or some) nodes in the cluster. Useful for log aggregation, cluster storage daemon, monitoring. An example would be Grafana.
-  - StatefulSet: Similar to deployments but designed for stateful workloads. Has sticky identity (e.g., pod-0, pod-1), each pod mounts separate volumes, rollout behavior is ordered. Limitation: can't modify many of the fields after a StatefulSet has been created. InitContainers are often used with StatefulSets.
+![Services](images/service.png)
+
+- Jobs: pods with completion tracking. Adds ability to retry pods. To investigate a job: `kubectl describe job some-job`
+- CronJobs: scheduled jobs. [How the schedule string works](https://crontab.guru).
+- DaemonSet: runs a copy of the specific pod on all (or some) nodes in the cluster. Useful for log aggregation, cluster storage daemon, monitoring. An example would be Grafana.
+- StatefulSet: Similar to deployments but designed for stateful workloads. Has sticky identity (e.g., pod-0, pod-1), each pod mounts separate volumes, rollout behavior is ordered. Limitation: can't modify many of the fields after a StatefulSet has been created. InitContainers are often used with StatefulSets.
   Note that a headless ClusterIP service is needed to address each pod in the StatefulSet individually (DNS resolution) as the normal ClusterIP service provides a single stable IP address and DNS name for accessing the StatefulSet pods as a whole and not individually.
-  - ConfigMaps: enable environment specific configuration to be decoupled from container images. Two primary styles: property-like keys, file-like keys.
-  - Secrets: similar to ConfigMaps with one main difference: data is base64 encoded. This is to support binary data.
-  - Ingress: enables routing traffic to many services via a single external LoadBalancer (ingress controllers e.g., Ingress-nginx, HAProxy, Kong). Only officialy supports layer 7 routing but some application allow for layer 4 (TCP/UDP) routing.
+- ConfigMaps: enable environment specific configuration to be decoupled from container images. Two primary styles: property-like keys, file-like keys.
+- Secrets: similar to ConfigMaps with one main difference: data is base64 encoded. This is to support binary data.
+- Ingress: enables routing traffic to many services via a single external LoadBalancer (ingress controllers e.g., Ingress-nginx, HAProxy, Kong). Only officialy supports layer 7 routing but some application allow for layer 4 (TCP/UDP) routing.
   ![Ingress](images/ingress.png)
-  - GatewayAPI: evolution of the Ingress API. Adds support for layer 4 routing and more advanced routing scenarios.
+- GatewayAPI: evolution of the Ingress API. Adds support for layer 4 routing and more advanced routing scenarios.
   ![GatewayAPI](images/gateway.png)
   (See Ingress x GatewayAPI x LoadBalancer GPT explanation below)
-  - PersistentVolume & PersistentVolumeClaim: provides api for persistent storage. Access modes: ReadWriteOnce (limited mounting to one node) ReadWriteOncePod (one pod), ReadOnlyMany, ReadWriteMany. Reclaim policy: retain vs delete.
+- PersistentVolume & PersistentVolumeClaim: provides api for persistent storage. Access modes: ReadWriteOnce (limited mounting to one node) ReadWriteOncePod (one pod), ReadOnlyMany, ReadWriteMany. Reclaim policy: retain vs delete.
   Note that dynamically specified Deployments and StatefulSets behave different when it comes tp PersistentVolumeClaim, where Deployment only creates one volume claim that is shared across the pods but StatefulSets creates one per pod.
   ![Volume](images/volume.png)
-  - RBAC (ServiceAccount, Role, RoleBinding): provide applications or users access to the Kubernetes API. Access can be granted by namespace or cluster wide.
-  - Labels: key-value pairs used to identify and organize Kubernetes resources. Can be used to filter api-servier queries (e.g., with kubectl).
-  - Annotations: Key-value pairs used for non-identifiying metadata. Used for  things like configuration details, deployment history. Often used by tools to configure specific behaviors (e.g., ingress annotations).
-**Ingress x GatewayAPI x LoadBalancer GPT explanation:**
+- RBAC (ServiceAccount, Role, RoleBinding): provide applications or users access to the Kubernetes API. Access can be granted by namespace or cluster wide.
+- Labels: key-value pairs used to identify and organize Kubernetes resources. Can be used to filter api-servier queries (e.g., with kubectl).
+- Annotations: Key-value pairs used for non-identifiying metadata. Used for things like configuration details, deployment history. Often used by tools to configure specific behaviors (e.g., ingress annotations).
+  **Ingress x GatewayAPI x LoadBalancer GPT explanation:**
 
 **Ingress** is a Kubernetes API object that manages external access to services within a Kubernetes cluster, typically HTTP/HTTPS traffic. It acts as a smart router, allowing you to define rules for routing traffic from outside the cluster to internal services based on hostnames, paths, or other criteria.
 
@@ -379,7 +413,8 @@ A **Load Balancer** in Kubernetes is typically an external or cloud-managed reso
 2. **Routing to the Cluster:**  
    The load balancer forwards the traffic to one or more Kubernetes nodes, targeting the Ingress Controller or Gateway implementation running as a pod.
 
-3. **Application Routing:**  
+3. **Application Routing:**
+
    - If using **Ingress**, the Ingress Controller reads Ingress resources and routes the traffic to the correct service based on the rules.
    - If using **Gateway API**, the Gateway implementation reads Gateway and Route resources to determine how to route the traffic.
 
@@ -390,13 +425,15 @@ A **Load Balancer** in Kubernetes is typically an external or cloud-managed reso
 
 Helm is the De-facto standard for distributing software for Kubernetes. Its a combination of a package manager and a templating engine. Primary use cases: application deployment, environment management.
 Commands:
- - helm install
- - helm upgrade
- - helm rollback
- 
+
+- helm install
+- helm upgrade
+- helm rollback
+
 ![helm](images/helm.png)
 
 #### Demo Application
+
 ![Demo Application](images/demo-application-architecture.png)
 Demo application architecture. Container images hosting on docker hub used for all components except postgres and ingress controller, to which helm charts were used.
 
@@ -404,25 +441,27 @@ Demo application architecture. Container images hosting on docker hub used for a
 
 Kubernetes is not just a container orchestrator.
 It provides an API for:
- - Declaring a set of resources.
- - Observing and acting upon those resources (control loop).
+
+- Declaring a set of resources.
+- Observing and acting upon those resources (control loop).
 
 Custom Resource Definitions (CRDs) allow applications to extend the default resource set.
 
 Custom controllers observe and act upon CRDs.
 
 Use Cases:
- - Embed custom login into "Operators" (CloudNativePG).
- - Manage TLS certificates (Cert-Manager).
- - Deploy infrastructure with automatic reconciliation (Crossplane).
 
- To build your own resource, define your own configuration and build a controller (operator) to act upon that custom configuration.
+- Embed custom login into "Operators" (CloudNativePG).
+- Manage TLS certificates (Cert-Manager).
+- Deploy infrastructure with automatic reconciliation (Crossplane).
 
- ![Meme](images/meme.png)
+To build your own resource, define your own configuration and build a controller (operator) to act upon that custom configuration.
 
- #### Auxiliary Tooling
+![Meme](images/meme.png)
 
- **CloudNative PG:** A Kubernetes operator that manages PostgreSQL workloads with high availability, disaster recovery, and cloud-native features. Barman: backup and recovery manager.
+#### Auxiliary Tooling
+
+**CloudNative PG:** A Kubernetes operator that manages PostgreSQL workloads with high availability, disaster recovery, and cloud-native features. Barman: backup and recovery manager.
 
 **Trivy Operator:** A Kubernetes operator that continuously scans your cluster for vulnerabilities and misconfigurations using Trivy scanner.
 
@@ -433,4 +472,12 @@ Use Cases:
 **External Secrets Operator**: A Kubernetes operator that synchronizes secrets from external APIs (like AWS Secrets Manager, HashiCorp Vault, or Azure Key Vault) into Kubernetes as Secret resources.
 
 #### Debugging
-[Troubleshooting](https://learnk8s.io/troubleshooting-deployments)
+
+[Troubleshooting Guide](https://learnk8s.io/troubleshooting-deployments)
+
+#### Deploying to Multiple Environments
+
+1. Kustomize: a tool built into kubectl. Uses base + overlay model where you define some base configuration and then for each environment you will specify an overlay. Its limitations lie within lists and multi-line strings in YAML.
+   ![Kustomize](images/kustomize.png)
+2. Helm: uses a templating model. A configuration file for each environment. Has "hooks" which allow encoding dependencies. Its limitations are with the un-readable templates at a large scale, boilerplate configuration, and CRD management is limited.
+3. Kluctl: uses a templating model. Also has hooks. Integrates with helm and kustomize. Includes a built in GitOps engine. Great choice for deploying to multiple environments, but requires slightly more setup.
