@@ -634,8 +634,17 @@ ArgoCD IU Lifecycle:
 
 ![ArgoCD IU Lifecycle](images/argocdiu.png)
 
-Argo CD has three phases (resource hooks) when applying resources: the first phase is executed before applying the manifests (PreSync), the second phase is when the manifests are applied (Sync), and the third phase is executed after all manifests are applied and
-synchronized (PostSync).
+Argo CD has three phases (resource hooks) when applying resources: the first phase is executed before applying the manifests (PreSync), the second phase is when the manifests are applied (Sync), and the third phase is executed after all manifests are applied and synchronized (PostSync).
+
+Overview of the available hooks:
+
+| Hook | Description | Use case |
+|------|-------------|----------|
+| PreSync | Executes prior to the application of the manifests | Database migrations |
+| Sync | Executes at the same time as manifests | Complex rolling update strategies like canary releases or dark launches |
+| PostSync | Executes after all Sync hooks have completed and were successful (healthy) | Run tests to validate deployment was correctly done |
+| SyncFail | Executes when the sync operation fails | Rollback operations in case of failure |
+| Skip | Skip the application of the manifest | When manual steps are required to deploy the application (i.e., releasing public traffic to new version) |
 
 A sync wave is a way to order how Argo CD applies the manifests stored in Git. All manifests have zero waves by default, and the lower values go first. You can use the `argocd.argoproj.io/sync-wave` annotation to set the wave number to a resource.
 
