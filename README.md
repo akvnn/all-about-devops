@@ -4,7 +4,7 @@ These notes are meant to be coupled with a practical component and serve merely 
 
 _Have fun.. and remember, do not get stuck in tutorial hell :)_
 
-### DevOps
+### DevOps Overview
 
 #### What is DevOps?
 
@@ -21,6 +21,8 @@ DevOps is a collaborative culture and set of practices that unify software devel
 | **Incident Management**          | Respond to and resolve outages with tools for alerts, collaboration, and RCA. | PagerDuty, Opsgenie, Jira Service Management |
 | **Security (DevSecOps)**         | Integrate security checks into pipelines to identify vulnerabilities early.   | Snyk, SonarQube, HashiCorp Vault             |
 | **Configuration Management**     | Automate server/application configuration to ensure consistency.              | Ansible, Chef, Puppet                        |
+
+**End of DevOps Overview!**
 
 ### Containers ([reference](https://courses.devopsdirective.com/docker-beginner-to-pro))
 
@@ -49,6 +51,8 @@ Contents of directories which have the same path within the merged branches will
 This approach allows for efficient use of space because common layers can be shared. For example, if multiple containers from the same image are created on a single host, the container runtime only has to allocate a thin overlay specific to each container, while the underlying image layers can be shared. More detail on understanding the implications of these filesystem on data persistence can be found in 04-using-3rd-party-containers.
 
 ![Union File System](images/ufs.png)
+
+**End of Containers!**
 
 ### Github Actions
 
@@ -105,171 +109,38 @@ In addition to default environment variables, you can use defined variables as c
    - Sets up Git credentials for subsequent Git operations.
    - Configures the Git environment for the workflow.
 
-### GitOps
+  2. actions/setup-node:
+    - Sets up a Node.js environment for use in your workflow.
+    - Allows you to specify the Node.js version.
+    - Useful for installing dependencies and running JavaScript/TypeScript builds or tests.
 
-#### What is GitOps?
+  3. actions/cache:
+    - Caches dependencies and build outputs to speed up workflow execution.
+    - Commonly used to cache package manager directories (e.g., npm, pip, Maven).
 
-GitOps is a way to do Kubernetes cluster management and application delivery. It works by using Git as a single source of truth for declarative infrastructure and applications (i.e., infrastructure as code), together with tools ensuring the actual state of infrastructure and applications converges towards the desired state declared in Git. With Git at the center of your delivery pipelines, developers can make pull requests to accelerate and simplify application deployments and operations tasks to your infrastructure or container-orchestration system (e.g. Kubernetes).
+  4. actions/upload-artifact & actions/download-artifact:
+    - Uploads and downloads build artifacts between workflow steps or jobs.
+    - Useful for sharing files (e.g., test reports, binaries) across jobs.
 
-![GitOps Conceptual Diagram](images/gitops_conceptual_diagram.svg)
+  5. docker/build-push-action:
+    - Builds and pushes Docker images to a container registry.
+    - Supports advanced features like build caching and multi-platform builds.
 
-The core idea of GitOps is having a Git repository that always contains declarative descriptions of the infrastructure currently desired in the production environment and an automated process to make the production environment match the described state in the repository. If you want to deploy a new application or update an existing one, you only need to update the repository - the automated process handles everything else. It’s like having cruise control for managing your applications in production.
+  6. actions/setup-python:
+    - Sets up a Python environment for your workflow.
+    - Allows you to specify the Python version and install dependencies.
 
-_GitOps: versioned CI/CD on top of declarative infrastructure. Stop scripting and start shipping._ - Kelsey Hightower
+  7. github/codeql-action:
+    - Runs CodeQL analysis for security and code quality scanning.
+    - Helps identify vulnerabilities in your codebase.
 
-_GitOps is a subset of DevOps: GitOps implements DevOps principles (automation, collaboration) but focuses specifically on deployment workflows. - Deepseek R1_
+  8. actions/github-script:
+    - Allows you to run custom JavaScript directly in your workflow.
+    - Useful for automating GitHub API calls or custom logic.
 
-#### Perks of using GitOps
+  For a comprehensive list, see the [GitHub Actions Marketplace](https://github.com/marketplace?type=actions).
 
-_High Velocity Deployments_: What is unique about GitOps is that you don’t have to switch tools for deploying your application. Everything happens in the version control system you use for developing the application anyways.
-
-_Easy and Fast Error Recovery_: With GitOps you have a complete history of how your environment changed over time. This makes error recovery as easy as issuing a `git revert` and watching your environment being restored.
-
-_The Git record is then not just an audit log but also a transaction log. You can roll back & forth to any snapshot._ - Alexis Richardson
-
-_Easier Credential Management_: GitOps allows you to manage deployments completely from inside your environment. For that, your environment only needs access to your repository and image registry. That’s it. You don’t have to give your developers direct access to the environment.
-
-_Self-documenting Deployments_: Have you ever SSH’d into a server and wondered what’s running there? With GitOps, every change to any environment must happen through the repository. You can always check out the master branch and get a complete description of what is deployed where plus the complete history of every change ever made to the system. And you get an audit trail of any changes in your system for free!
-
-_Shared Knowledge_: Using Git to store complete descriptions of your deployed infrastructure allows everybody in your team to check out its evolution over time. With great commit messages everybody can reproduce the thought process of changing infrastructure and also easily find examples of how to set up new systems.
-
-#### How does GitOps work?
-
-_Environment Configurations as Git repository_: GitOps organizes the deployment process around code repositories as the central element. There are at least two repositories: the application repository and the environment configuration repository. The application repository contains the source code of the application and the deployment manifests to deploy the application. The environment configuration repository contains all deployment manifests of the currently desired infrastructure of an deployment environment. It describes what applications and infrastructural services (message broker, service mesh, monitoring tool, …) should run with what configuration and version in the deployment environment.
-
-_Push-based vs. Pull-based Deployments_: There are two ways to implement the deployment strategy for GitOps: Push-based and Pull-based deployments. The difference between the two deployment types is how it is ensured, that the deployment environment actually resembles the desired infrastructure. When possible, the Pull-based approach should be preferred as it is considered the more secure and thus better practice to implement GitOps.
-
-The Push-based deployment strategy is implemented by popular CI/CD tools such as Jenkins, CircleCI, or Travis CI. The source code of the application lives inside the application repository along with the Kubernetes YAMLs needed to deploy the app. Whenever the application code is updated, the build pipeline is triggered, which builds the container images and finally the environment configuration repository is updated with new deployment descriptors.
-
-Tip: You can also just store templates of the YAMLs in the application repository. When a new version is built, the template can be used to generate the YAML in the environment configuration repository.
-
-![Push-based Deployment Strategy](images/push.png)
-
-With this approach it is indispensable to provide credentials to the deployment environment. So the pipeline has god-mode enabled. In some use cases a Push-based deployment is inevitable when running an automated provisioning of cloud infrastructure. In such cases it is strongly recommended to utilize the fine-granular configurable authorization system of the cloud provider for more restrictive deployment permissions.
-
-Another important thing to keep in mind when using this approach is that the deployment pipeline only is triggered when the environment repository changes. It can not automatically notice any deviations of the environment and its desired state. This means, it needs some way of monitoring in place, so that one can intervene if the environment doesn’t match what is described in the environment repository.
-
-The Pull-based deployment strategy uses the same concepts as the push-based variant but differs in how the deployment pipeline works. Traditional CI/CD pipelines are triggered by an external event, for example when new code is pushed to an application repository. With the pull-based deployment approach, the operator is introduced. It takes over the role of the pipeline by continuously comparing the desired state in the environment repository with the actual state in the deployed infrastructure. Whenever differences are noticed, the operator updates the infrastructure to match the environment repository. Additionally the image registry can be monitored to find new versions of images to deploy.
-
-![Pull-based Deployment Strategy](images/push.png)
-
-Just like the push-based deployment, this variant updates the environment whenever the environment repository changes. However, with the operator, changes can also be noticed in the other direction. Whenever the deployed infrastructure changes in any way not described in the environment repository, these changes are reverted. This ensures that all changes are made traceable in the Git log, by making all direct changes to the cluster impossible.
-
-This change in direction solves the problem of push-based deployments, where the environment is only updated when the environment repository is updated. However, this doesn’t mean you can completely do without any monitoring in place. Most operators support sending mails or Slack notifications if it can not bring the environment to the desired state for any reason, for example if it can not pull a container image. Additionally, you probably should set up monitoring for the operator itself, as there is no longer any automated deployment process without it.
-
-The operator should always live in the same environment or cluster as the application to deploy. This prevents the god-mode, seen with the push-based approach, where credentials for doing deployments are known by the CI/CD pipeline. When the actual deploying instance lives inside the very same environment, no credentials need to be known by external services. The Authorization mechanism of the deployment platform in use can be utilized to restrict the permissions on performing deployments. This has a huge impact in terms of security. When using Kubernetes, RBAC configurations and service accounts can be utilized.
-
-#### Working with Multiple Applications and Environments
-
-You can always just set up multiple build pipelines that update the environment repository. From there on the regular automated GitOps workflow kicks in and deploys all parts of your application.
-
-![Working with Multiple Applications and Environments](images/multiple.png)
-
-Managing multiple environments with GitOps can be done by just using separate branches in the environment repository. You can set up the operator or the deployment pipeline to react to changes on one branch by deploying to the production environment and another to deploy to staging.
-
-#### Secret Handling
-
-First of all, never store secrets in plain text in git! Never!
-
-That being said, you have secrets created within the environment which never leave the environment. The secret stays unknown, and applications get the secrets they require but they aren’t exposed to the outside world. For example, you provision a database within the environment and give the secret to the applications interacting with the database only.
-
-Another approach is to add a private key once to the environment (probably by someone from a dedicated ops team) and from that point you can add secrets encrypted by the public key to the environment repository. There’s even tool support for such sealed secrets in the K8s ecosystem.
-
-_There are no GitOps engineers. GitOps is not a role (and neither is DevOps). GitOps is a set of practices. You can look for a developer who has experience practicing GitOps — or simply let your developers try out those practices._
-
-#### GitOps References
-
-- https://github.com/weaveworks/awesome-gitops
-- https://www.gitops.tech/
-
-### GitOps Cookbook ([link](https://developers.redhat.com/e-books/gitops-cookbook))
-
-#### Chapter 1: Introduction
-
-#### Intro
-
-GitOps is a methodology and practice that uses Git repositories as a single source of truth to deliver infrastructure as code. It takes the pillars and approaches from DevOps culture and provides a framework to start realizing the results. The relationship between DevOps and GitOps is close, as GitOps has become the popular choice to implement and enhance DevOps, platform engineering, and SRE.
-CI/CD pipelines are one of the most common use cases for GitOps.
-
-The three main pillars of GitOps are:
-
-- Git is the single source of truth
-- Treat everything as code
-- Operations are performed through Git workflows
-
-**Some Terms:**
-
-_Declarative_: A system managed by GitOps must have its desired state expressed declaratively.
-_Versioned and immutable_: The desired state is stored in a way that enforces immutability and versioning and retains a complete version history.
-_Pulled automatically_: Software agents automatically pull the desired state declarations from the source.
-_Continuously reconciled_: Software agents continuously observe the actual system state and attempt to apply the desired state.
-
-#### Kubernetes CICD
-
-In a typical CI/CD pipeline, submitted code checks the CI process while the CD process checks and applies requirements for things like security, infrastructure as code, or any other boundaries set for the application framework. All code changes are tracked, making updates easy while also providing version control should a rollback be needed. CD is the GitOps domain and it works together with the CI part to deploy apps in multiple environments.
-
-With Kubernetes, it’s easy to implement an in-cluster CI/CD pipeline. You can have CI software create the container image representing your application and store it in a container image registry. Afterward, a Git workflow such as a pull request can change the Kubernetes manifests illustrating the deployment of your apps and start a CD sync loop.
-
-![Model Diagram](images/model.png)
-
-#### App Deployment
-
-As GitOps is an agnostic, platform-independent approach, the application deployment model on Kubernetes can be either in-cluster or multicluster. An external
-GitOps tool can use Kubernetes just as a target platform for deploying apps. At the same time, in-cluster approaches run a GitOps engine inside Kubernetes to deploy apps and sync manifests in one or more Kubernetes clusters.
-
-The GitOps engine takes care of the CD part of the CI/CD pipeline and accomplishes
-_Deploy_: Deploy the manifests from Git.
-
-_Monitor_: Monitor either the Git repo or the cluster state.
-
-_Detect Drift_: Detect any change from what is described in Git and what is present in the cluster.
-
-_Take Action_: Perform an action that reflects what is on Git (rollback or three-way diff). Git is the source of truth, and any change is performed via a Git workflow.
-
-![GitOps Loop](images/loop.png)
-
-_Cultural Change in IT Organizations Needed_: The “Teaching Elephants to Dance (and Fly!)” speech from Burr Sutter gives a clear idea of the context. The elephant is where your organization is today. There are phases of change between traditional and modern environments powered by GitOps
-tools. Some organizations have the luxury of starting from scratch, but for many
-businesses, the challenge is teaching their lumbering elephant to dance like a graceful
-ballerina.
-
-#### Chapter 2: Requirements
-
-#### Minikube
-
-Minikube is a tool that simplifies running a Kubernetes cluster locally on a single machine. In the case of Minikube, the entire Kubernetes cluster (control plane and worker node) is installed inside a VM or container. This is a special case for local development and testing, not a production setup. In essence, the Kubernetes cluster is installed inside a VM or container, and it orchestrates containers from there.
-
-Kubernetes is well known as a container orchestration platform to deploy and manage apps. However, it doesn’t include support for building container images out-of-the-box. Indeed, according to Kubernetes documentation: “(Kubernetes) Does not deploy source code and does not build your application. Continuous Integration, Delivery, and Deployment (CI/CD) workflows are determined by organization cultures and preferences as well as technical requirements.
-
-#### Chapter 3: Containers
-
-Shipwright is an extensible framework for building container images on Kubernetes. It supports popular tools such as Buildah, Cloud Native Buildpacks, and kaniko. It uses Kubernetes-style APIs, and it runs workloads using Tekton.
-
-kaniko is another dockerless solution to build container images from a Dockerfile inside a container or Kubernetes cluster. Shipwright brings additional APIs to Kubernetes to use tools such as kaniko to create container images, acting as an abstract layer that can be considered an extensible building system for Kubernetes.
-
-Some key concepts in Shipwright, which are defined using Kubernetes Custom Resource Definitions (CRDs). Each CRD represents a specific part of the build process (defined with a unique yaml file):
-
-1. ClusterBuildStrategy
-   - What it is: This defines how the build will be executed. It specifies the steps and tools to use for building a container image.
-   - Example: You might use a ClusterBuildStrategy for tools like Kaniko, Buildah, or Cloud Native Buildpacks. It describes the process of building an image, such as which Dockerfile to use, what commands to run, and how to push the image to a registry.
-   - Scope: It is cluster-wide, meaning it can be used by builds in any namespace.
-2. Build
-   - What it is: This defines what to build and where to push the resulting container image. It references a ClusterBuildStrategy to specify how the build should be executed.
-   - Key Details: Specifies the source code (e.g., a Git repository). Specifies the output image (e.g., the container registry and image name). Links to a ClusterBuildStrategy to define the build process.
-   - Example: A Build object might say, "Take the code from this Git repository, use the Kaniko strategy, and push the resulting image to Docker Hub."
-3. BuildRun
-   - What it is: This represents the actual execution of a build. When you create a BuildRun object, it triggers the build process defined in the Build object.
-   - Key Details: It uses the Build object as a template. It creates a Kubernetes Pod to execute the build process. Once the BuildRun is complete, the container image is pushed to the specified registry.
-   - Example: A BuildRun object might say, "Run the build defined in the Build object named my-app-build."
-
-#### Chapter 4: Kustomize
-
-Deploying to a Kubernetes cluster is, in summary, applying some YAML files and checking the result.
-
-The hard part is developing the initial YAML files version; after that, usually, they suffer only small changes such as updating the container image tag version, the number of replicas, or a new configuration value. One option is to make these changes directly in the YAML files—it works, but any error in this version (modification of the wrong line, deleting something by mistake, putting in the wrong whitespace) might be catastrophic.
-
-For this reason, some tools let you define base Kubernetes manifests (which change infrequently) and specific files (maybe one for each environment) for setting the parameters that change more frequently. One of these tools is Kustomize.
-
+**End of Github Actions!**
 ### DevOps Directive Kubernetes Course ([link](https://youtu.be/2T86xAtR6Fo?si=FrIHT84JCSGWPfY6))
 
 #### Terminologies
@@ -379,8 +250,22 @@ Kubernetes uses Docker images (OCI-compliant container images) as the standardiz
 **Key points about Ingress:**
 
 - It provides a way to expose multiple services under the same IP address or DNS name.
-- Ingress resources define rules (e.g., "traffic to `/api` goes to Service A, `/web` goes to Service B").
+- Ingress resources define rules (e.g., "traffic to `/api` goes to Service A, `/web` goes to Service B"). Services here are the different application components.
+
+  Typical flow of a request:
+  ```
+  External Request → Load Balancer → Ingress Controller → Single Ingress Resource
+                                              ├── /api → Backend Service → Backend Pods
+                                              ├── /web → Frontend Service → Frontend Pods
+                                              └── /admin → Admin Service → Admin Pods
+  ```
 - Ingress requires an **Ingress Controller** (like NGINX, Traefik, or HAProxy) to actually implement the routing logic.
+
+**Important Summary:**
+
+**Ingress Controller = The software/infrastructure (nginx, traefik, ALB) - shared across cluster.**
+
+**Ingress Resource = Your app's specific routing rules - one per app/service.**
 
 ---
 
@@ -530,3 +415,237 @@ This workflow builds and pushes Docker images (CI), while updating image tags in
 - Validate deployments worked as expected.
 
 **End of DevOps Directive Kubernetes Course!**
+
+### GitOps
+
+#### What is GitOps?
+
+GitOps is a way to do Kubernetes cluster management and application delivery. It works by using Git as a single source of truth for declarative infrastructure and applications (i.e., infrastructure as code), together with tools ensuring the actual state of infrastructure and applications converges towards the desired state declared in Git. With Git at the center of your delivery pipelines, developers can make pull requests to accelerate and simplify application deployments and operations tasks to your infrastructure or container-orchestration system (e.g. Kubernetes).
+
+![GitOps Conceptual Diagram](images/gitops_conceptual_diagram.svg)
+
+The core idea of GitOps is having a Git repository that always contains declarative descriptions of the infrastructure currently desired in the production environment and an automated process to make the production environment match the described state in the repository. If you want to deploy a new application or update an existing one, you only need to update the repository - the automated process handles everything else. It’s like having cruise control for managing your applications in production.
+
+_GitOps: versioned CI/CD on top of declarative infrastructure. Stop scripting and start shipping._ - Kelsey Hightower
+
+_GitOps is a subset of DevOps: GitOps implements DevOps principles (automation, collaboration) but focuses specifically on deployment workflows. - Deepseek R1_
+
+#### Perks of using GitOps
+
+_High Velocity Deployments_: What is unique about GitOps is that you don’t have to switch tools for deploying your application. Everything happens in the version control system you use for developing the application anyways.
+
+_Easy and Fast Error Recovery_: With GitOps you have a complete history of how your environment changed over time. This makes error recovery as easy as issuing a `git revert` and watching your environment being restored.
+
+_The Git record is then not just an audit log but also a transaction log. You can roll back & forth to any snapshot._ - Alexis Richardson
+
+_Easier Credential Management_: GitOps allows you to manage deployments completely from inside your environment. For that, your environment only needs access to your repository and image registry. That’s it. You don’t have to give your developers direct access to the environment.
+
+_Self-documenting Deployments_: Have you ever SSH’d into a server and wondered what’s running there? With GitOps, every change to any environment must happen through the repository. You can always check out the master branch and get a complete description of what is deployed where plus the complete history of every change ever made to the system. And you get an audit trail of any changes in your system for free!
+
+_Shared Knowledge_: Using Git to store complete descriptions of your deployed infrastructure allows everybody in your team to check out its evolution over time. With great commit messages everybody can reproduce the thought process of changing infrastructure and also easily find examples of how to set up new systems.
+
+#### How does GitOps work?
+
+_Environment Configurations as Git repository_: GitOps organizes the deployment process around code repositories as the central element. There are at least two repositories: the application repository and the environment configuration repository. The application repository contains the source code of the application and the deployment manifests to deploy the application. The environment configuration repository contains all deployment manifests of the currently desired infrastructure of an deployment environment. It describes what applications and infrastructural services (message broker, service mesh, monitoring tool, …) should run with what configuration and version in the deployment environment.
+
+_Push-based vs. Pull-based Deployments_: There are two ways to implement the deployment strategy for GitOps: Push-based and Pull-based deployments. The difference between the two deployment types is how it is ensured, that the deployment environment actually resembles the desired infrastructure. When possible, the Pull-based approach should be preferred as it is considered the more secure and thus better practice to implement GitOps.
+
+The Push-based deployment strategy is implemented by popular CI/CD tools such as Jenkins, CircleCI, or Travis CI. The source code of the application lives inside the application repository along with the Kubernetes YAMLs needed to deploy the app. Whenever the application code is updated, the build pipeline is triggered, which builds the container images and finally the environment configuration repository is updated with new deployment descriptors.
+
+Tip: You can also just store templates of the YAMLs in the application repository. When a new version is built, the template can be used to generate the YAML in the environment configuration repository.
+
+![Push-based Deployment Strategy](images/push.png)
+
+With this approach it is indispensable to provide credentials to the deployment environment. So the pipeline has god-mode enabled. In some use cases a Push-based deployment is inevitable when running an automated provisioning of cloud infrastructure. In such cases it is strongly recommended to utilize the fine-granular configurable authorization system of the cloud provider for more restrictive deployment permissions.
+
+Another important thing to keep in mind when using this approach is that the deployment pipeline only is triggered when the environment repository changes. It can not automatically notice any deviations of the environment and its desired state. This means, it needs some way of monitoring in place, so that one can intervene if the environment doesn’t match what is described in the environment repository.
+
+The Pull-based deployment strategy uses the same concepts as the push-based variant but differs in how the deployment pipeline works. Traditional CI/CD pipelines are triggered by an external event, for example when new code is pushed to an application repository. With the pull-based deployment approach, the operator is introduced. It takes over the role of the pipeline by continuously comparing the desired state in the environment repository with the actual state in the deployed infrastructure. Whenever differences are noticed, the operator updates the infrastructure to match the environment repository. Additionally the image registry can be monitored to find new versions of images to deploy.
+
+![Pull-based Deployment Strategy](images/push.png)
+
+Just like the push-based deployment, this variant updates the environment whenever the environment repository changes. However, with the operator, changes can also be noticed in the other direction. Whenever the deployed infrastructure changes in any way not described in the environment repository, these changes are reverted. This ensures that all changes are made traceable in the Git log, by making all direct changes to the cluster impossible.
+
+This change in direction solves the problem of push-based deployments, where the environment is only updated when the environment repository is updated. However, this doesn’t mean you can completely do without any monitoring in place. Most operators support sending mails or Slack notifications if it can not bring the environment to the desired state for any reason, for example if it can not pull a container image. Additionally, you probably should set up monitoring for the operator itself, as there is no longer any automated deployment process without it.
+
+The operator should always live in the same environment or cluster as the application to deploy. This prevents the god-mode, seen with the push-based approach, where credentials for doing deployments are known by the CI/CD pipeline. When the actual deploying instance lives inside the very same environment, no credentials need to be known by external services. The Authorization mechanism of the deployment platform in use can be utilized to restrict the permissions on performing deployments. This has a huge impact in terms of security. When using Kubernetes, RBAC configurations and service accounts can be utilized.
+
+#### Working with Multiple Applications and Environments
+
+You can always just set up multiple build pipelines that update the environment repository. From there on the regular automated GitOps workflow kicks in and deploys all parts of your application.
+
+![Working with Multiple Applications and Environments](images/multiple.png)
+
+Managing multiple environments with GitOps can be done by just using separate branches in the environment repository. You can set up the operator or the deployment pipeline to react to changes on one branch by deploying to the production environment and another to deploy to staging.
+
+#### Secret Handling
+
+First of all, never store secrets in plain text in git! Never!
+
+That being said, you have secrets created within the environment which never leave the environment. The secret stays unknown, and applications get the secrets they require but they aren’t exposed to the outside world. For example, you provision a database within the environment and give the secret to the applications interacting with the database only.
+
+Another approach is to add a private key once to the environment (probably by someone from a dedicated ops team) and from that point you can add secrets encrypted by the public key to the environment repository. There’s even tool support for such sealed secrets in the K8s ecosystem.
+
+_There are no GitOps engineers. GitOps is not a role (and neither is DevOps). GitOps is a set of practices. You can look for a developer who has experience practicing GitOps — or simply let your developers try out those practices._
+
+#### GitOps References
+
+- https://github.com/weaveworks/awesome-gitops
+- https://www.gitops.tech/
+
+**End of GitOps!**
+
+### GitOps Cookbook ([link](https://developers.redhat.com/e-books/gitops-cookbook))
+
+#### Chapter 1: Introduction
+
+#### Intro
+
+GitOps is a methodology and practice that uses Git repositories as a single source of truth to deliver infrastructure as code. It takes the pillars and approaches from DevOps culture and provides a framework to start realizing the results. The relationship between DevOps and GitOps is close, as GitOps has become the popular choice to implement and enhance DevOps, platform engineering, and SRE.
+CI/CD pipelines are one of the most common use cases for GitOps.
+
+The three main pillars of GitOps are:
+
+- Git is the single source of truth
+- Treat everything as code
+- Operations are performed through Git workflows
+
+**Some Terms:**
+
+_Declarative_: A system managed by GitOps must have its desired state expressed declaratively.
+_Versioned and immutable_: The desired state is stored in a way that enforces immutability and versioning and retains a complete version history.
+_Pulled automatically_: Software agents automatically pull the desired state declarations from the source.
+_Continuously reconciled_: Software agents continuously observe the actual system state and attempt to apply the desired state.
+
+#### Kubernetes CICD
+
+In a typical CI/CD pipeline, submitted code checks the CI process while the CD process checks and applies requirements for things like security, infrastructure as code, or any other boundaries set for the application framework. All code changes are tracked, making updates easy while also providing version control should a rollback be needed. CD is the GitOps domain and it works together with the CI part to deploy apps in multiple environments.
+
+With Kubernetes, it’s easy to implement an in-cluster CI/CD pipeline. You can have CI software create the container image representing your application and store it in a container image registry. Afterward, a Git workflow such as a pull request can change the Kubernetes manifests illustrating the deployment of your apps and start a CD sync loop.
+
+![Model Diagram](images/model.png)
+
+#### App Deployment
+
+As GitOps is an agnostic, platform-independent approach, the application deployment model on Kubernetes can be either in-cluster or multicluster. An external
+GitOps tool can use Kubernetes just as a target platform for deploying apps. At the same time, in-cluster approaches run a GitOps engine inside Kubernetes to deploy apps and sync manifests in one or more Kubernetes clusters.
+
+The GitOps engine takes care of the CD part of the CI/CD pipeline and accomplishes
+_Deploy_: Deploy the manifests from Git.
+
+_Monitor_: Monitor either the Git repo or the cluster state.
+
+_Detect Drift_: Detect any change from what is described in Git and what is present in the cluster.
+
+_Take Action_: Perform an action that reflects what is on Git (rollback or three-way diff). Git is the source of truth, and any change is performed via a Git workflow.
+
+![GitOps Loop](images/loop.png)
+
+_Cultural Change in IT Organizations Needed_: The “Teaching Elephants to Dance (and Fly!)” speech from Burr Sutter gives a clear idea of the context. The elephant is where your organization is today. There are phases of change between traditional and modern environments powered by GitOps
+tools. Some organizations have the luxury of starting from scratch, but for many
+businesses, the challenge is teaching their lumbering elephant to dance like a graceful
+ballerina.
+
+#### Chapter 2: Requirements
+
+#### Minikube
+
+Minikube is a tool that simplifies running a Kubernetes cluster locally on a single machine. In the case of Minikube, the entire Kubernetes cluster (control plane and worker node) is installed inside a VM or container. This is a special case for local development and testing, not a production setup. In essence, the Kubernetes cluster is installed inside a VM or container, and it orchestrates containers from there.
+
+Kubernetes is well known as a container orchestration platform to deploy and manage apps. However, it doesn’t include support for building container images out-of-the-box. Indeed, according to Kubernetes documentation: “(Kubernetes) Does not deploy source code and does not build your application. Continuous Integration, Delivery, and Deployment (CI/CD) workflows are determined by organization cultures and preferences as well as technical requirements.
+
+#### Chapter 3: Containers
+
+Shipwright is an extensible framework for building container images on Kubernetes. It supports popular tools such as Buildah, Cloud Native Buildpacks, and kaniko. It uses Kubernetes-style APIs, and it runs workloads using Tekton.
+
+kaniko is another dockerless solution to build container images from a Dockerfile inside a container or Kubernetes cluster. Shipwright brings additional APIs to Kubernetes to use tools such as kaniko to create container images, acting as an abstract layer that can be considered an extensible building system for Kubernetes.
+
+Some key concepts in Shipwright, which are defined using Kubernetes Custom Resource Definitions (CRDs). Each CRD represents a specific part of the build process (defined with a unique yaml file):
+
+1. ClusterBuildStrategy
+   - What it is: This defines how the build will be executed. It specifies the steps and tools to use for building a container image.
+   - Example: You might use a ClusterBuildStrategy for tools like Kaniko, Buildah, or Cloud Native Buildpacks. It describes the process of building an image, such as which Dockerfile to use, what commands to run, and how to push the image to a registry.
+   - Scope: It is cluster-wide, meaning it can be used by builds in any namespace.
+2. Build
+   - What it is: This defines what to build and where to push the resulting container image. It references a ClusterBuildStrategy to specify how the build should be executed.
+   - Key Details: Specifies the source code (e.g., a Git repository). Specifies the output image (e.g., the container registry and image name). Links to a ClusterBuildStrategy to define the build process.
+   - Example: A Build object might say, "Take the code from this Git repository, use the Kaniko strategy, and push the resulting image to Docker Hub."
+3. BuildRun
+   - What it is: This represents the actual execution of a build. When you create a BuildRun object, it triggers the build process defined in the Build object.
+   - Key Details: It uses the Build object as a template. It creates a Kubernetes Pod to execute the build process. Once the BuildRun is complete, the container image is pushed to the specified registry.
+   - Example: A BuildRun object might say, "Run the build defined in the Build object named my-app-build."
+
+#### Chapter 4: Kustomize
+
+Deploying to a Kubernetes cluster is, in summary, applying some YAML files and checking the result.
+
+The hard part is developing the initial YAML files version; after that, usually, they suffer only small changes such as updating the container image tag version, the number of replicas, or a new configuration value. One option is to make these changes directly in the YAML files—it works, but any error in this version (modification of the wrong line, deleting something by mistake, putting in the wrong whitespace) might be catastrophic.
+
+For this reason, some tools let you define base Kubernetes manifests (which change infrequently) and specific files (maybe one for each environment) for setting the parameters that change more frequently. One of these tools is Kustomize.
+
+#### Chapter 5: Helm
+
+Helm works similarly to Kustomize, but it’s a template solution and acts more like a package manager, producing artifacts that are versionable, sharable, or deployable.
+
+One of the differences between Kustomize and Helm is the concept of a Chart. A Chart is a packaged artifact that can be shared and contains multiple elements like dependencies on other Charts. Additionally, in contrast to Kustomize, which can be used either within the kubectl command or as a standalone CLI tool, Helm needs to be downloaded and installed in your local machine.
+
+Sample Helm project:
+![Helm Rlationship](images/helm-relationship.png)
+If you have multiple environments, you would simply have multiple `values.yaml` files.
+
+#### Chapter 6: Cloud Native CI/CD
+
+Cloud native refers to the model where cloud computing and cloud services are involved in this process. Examples include Tekton, Drone, and Github Actions.
+
+#### Chapter 7: ArgoCD
+
+CD is all about how to deploy an application to an environment (a Kubernetes cluster) using the GitOps methodology and not creating a script running kubectl/helm commands.
+
+As Daniel Bryant puts it, “If you weren’t using SSH in the past to deploy your application in production, don’t use kubectl to do it in Kubernetes.”
+
+A typical operation done in Kubernetes is a rolling update to a new version of the container, and ArgoCD integrates with another tool (e.g., Kustomize or Helm) to make this process smooth.
+
+An application in ArgoCD is composed of three Kubernetes manifest files, including a Namespace, a Deployment, and a Service definition.
+
+ArgoCD treats Git repositories as the single source of truth for Kubernetes deployments.
+
+**Sync Process:**
+
+1. **Monitors** GitHub repo for changes (polls every 3 minutes or via webhooks)
+2. **Fetches** YAML manifests from Git and caches temporarily
+3. **Detects drift** between cluster state and Git declarations
+4. **Applies manifests** to Kubernetes cluster using kubectl
+5. **Persists resources** in cluster's etcd database
+
+**Workflow:**
+
+Code Push → ArgoCD Detects → Fetch Manifests → Apply to Cluster → Resources Stored
+
+With a pure Argo CD solution, after the container image is published to a container registry, we need to update the Kubernetes/Kustomize/Helm manifest files pointing
+to the new container image and push the result to the Git repository. This is usually done during the continuous integration phase via Github Actions.
+
+Although this approach works, it could be automated so the cluster
+could detect a new image pushed to the container registry and update the current deployment file pointing to the newer version.
+ArgoCD IU is a Kubernetes controller monitoring for a new container version and updating the manifests (i.e., versions) defined in the ArgoCD YAML file. It then commits those changes to the Git repository, which triggers Argo CD to deploy the new version of the image.
+
+Using Github Actions to handle the update of versions in the Kubernetes manifests (e.g., ArgoCD YAML file) to point to the new versions is simpler and preferred (by myself, at least).
+
+ArgoCD IU Lifecycle:
+
+![ArgoCD IU Lifecycle](images/argocdiu.png)
+
+Argo CD has three phases (resource hooks) when applying resources: the first phase is executed before applying the manifests (PreSync), the second phase is when the manifests are applied (Sync), and the third phase is executed after all manifests are applied and
+synchronized (PostSync).
+
+A sync wave is a way to order how Argo CD applies the manifests stored in Git. All manifests have zero waves by default, and the lower values go first. You can use the `argocd.argoproj.io/sync-wave` annotation to set the wave number to a resource.
+
+For example, you might want to deploy a database first and then create the database schema; for this case, you should set a sync-wave lower in the database deployment file than in the job for creating the database schema.
+
+When Argo CD starts applying the manifests, it orders the resources in the following way:
+1. Phase
+2. Wave (lower precedence first)
+3. Kind
+4. Name
+
+**End of GitOps Cookbook!**
+
