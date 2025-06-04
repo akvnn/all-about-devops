@@ -50,7 +50,6 @@ _Have fun.. and remember, do not get stuck in tutorial hell :)_
 - [  Chapter 5: Helm](#chapter-5-helm)
 - [  Chapter 6: Cloud Native CI/CD](#chapter-6-cloud-native-cicd)
 - [  Chapter 7: ArgoCD](#chapter-7-argocd)
-- [Certified Kubernetes Application Developer (CKAD) Prep Notes]
 
 ### DevOps Overview
 
