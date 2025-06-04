@@ -1,8 +1,56 @@
-## DevOps Notes (Cheatsheet)
+# DevOps Notes (Cheatsheet)
 
 These notes are meant to be coupled with a practical component and serve merely as the theoritical reference. These notes combine various technical blogs, courses, and books. All references have been included.
 
 _Have fun.. and remember, do not get stuck in tutorial hell :)_
+
+### Table of Contents
+
+- [DevOps Overview](#devops-overview)
+- [  What is DevOps?](#what-is-devops)
+- [  Key DevOps Operations](#key-devops-operations)
+- [Containers](#containers-reference)
+- [  What is a Container?](#what-is-a-container)
+- [  Containers' Building Blocks](#containers-building-blocks)
+- [Github Actions](#github-actions)
+- [  What is Github Actions?](#what-is-github-actions)
+- [  Github Features](#github-features)
+- [  Types of Actions](#types-of-actions)
+- [  Github Actions Workflows](#github-actions-workflows)
+- [  Components of Github Actions](#components-of-github-actions)
+- [  More on Github Actions](#more-on-github-actions)
+- [  Some Important Actions](#some-important-actions)
+- [DevOps Directive Kubernetes Course](#devops-directive-kubernetes-course-link)
+- [  Terminologies](#terminologies)
+- [  Kubernetes Architecture](#kubernetes-architecture)
+- [  Kubernetes System Components](#kubernetes-system-components)
+- [  Setup Tools](#setup-tools)
+- [  Built-in Kubernetes Resources](#built-in-kubernetes-resources)
+- [  Helm](#helm)
+- [  Demo Application](#demo-application)
+- [  Extending the Kubernetes API](#extending-the-kubernetes-api)
+- [  Auxiliary Tooling](#auxiliary-tooling)
+- [  Developer Experience](#developer-experience)
+- [  Debugging](#debugging)
+- [  Deploying to Multiple Environments](#deploying-to-multiple-environments)
+- [  Cluster/Node Upgrades](#clusternode-upgrades)
+- [  CI/CD](#cicd)
+- [GitOps](#gitops)
+- [  What is GitOps?](#what-is-gitops)
+- [  Perks of using GitOps](#perks-of-using-gitops)
+- [  How does GitOps work?](#how-does-gitops-work)
+- [  Working with Multiple Applications and Environments](#working-with-multiple-applications-and-environments)
+- [  Secret Handling](#secret-handling)
+- [  GitOps References](#gitops-references)
+- [GitOps Cookbook](#gitops-cookbook-link)
+- [  Chapter 1: Introduction](#chapter-1-introduction)
+- [  Chapter 2: Requirements](#chapter-2-requirements)
+- [  Chapter 3: Containers](#chapter-3-containers)
+- [  Chapter 4: Kustomize](#chapter-4-kustomize)
+- [  Chapter 5: Helm](#chapter-5-helm)
+- [  Chapter 6: Cloud Native CI/CD](#chapter-6-cloud-native-cicd)
+- [  Chapter 7: ArgoCD](#chapter-7-argocd)
+- [Certified Kubernetes Application Developer (CKAD) Prep Notes]
 
 ### DevOps Overview
 
