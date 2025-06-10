@@ -6,50 +6,72 @@ _Have fun.. and remember, do not get stuck in tutorial hell :)_
 
 ### Table of Contents
 
-- [DevOps Overview](#devops-overview)
-- [  What is DevOps?](#what-is-devops)
-- [  Key DevOps Operations](#key-devops-operations)
-- [Containers](#containers-reference)
-- [  What is a Container?](#what-is-a-container)
-- [  Containers' Building Blocks](#containers-building-blocks)
-- [Github Actions](#github-actions)
-- [  What is Github Actions?](#what-is-github-actions)
-- [  Github Features](#github-features)
-- [  Types of Actions](#types-of-actions)
-- [  Github Actions Workflows](#github-actions-workflows)
-- [  Components of Github Actions](#components-of-github-actions)
-- [  More on Github Actions](#more-on-github-actions)
-- [  Some Important Actions](#some-important-actions)
-- [DevOps Directive Kubernetes Course](#devops-directive-kubernetes-course-link)
-- [  Terminologies](#terminologies)
-- [  Kubernetes Architecture](#kubernetes-architecture)
-- [  Kubernetes System Components](#kubernetes-system-components)
-- [  Setup Tools](#setup-tools)
-- [  Built-in Kubernetes Resources](#built-in-kubernetes-resources)
-- [  Helm](#helm)
-- [  Demo Application](#demo-application)
-- [  Extending the Kubernetes API](#extending-the-kubernetes-api)
-- [  Auxiliary Tooling](#auxiliary-tooling)
-- [  Developer Experience](#developer-experience)
-- [  Debugging](#debugging)
-- [  Deploying to Multiple Environments](#deploying-to-multiple-environments)
-- [  Cluster/Node Upgrades](#clusternode-upgrades)
-- [  CI/CD](#cicd)
-- [GitOps](#gitops)
-- [  What is GitOps?](#what-is-gitops)
-- [  Perks of using GitOps](#perks-of-using-gitops)
-- [  How does GitOps work?](#how-does-gitops-work)
-- [  Working with Multiple Applications and Environments](#working-with-multiple-applications-and-environments)
-- [  Secret Handling](#secret-handling)
-- [  GitOps References](#gitops-references)
-- [GitOps Cookbook](#gitops-cookbook-link)
-- [  Chapter 1: Introduction](#chapter-1-introduction)
-- [  Chapter 2: Requirements](#chapter-2-requirements)
-- [  Chapter 3: Containers](#chapter-3-containers)
-- [  Chapter 4: Kustomize](#chapter-4-kustomize)
-- [  Chapter 5: Helm](#chapter-5-helm)
-- [  Chapter 6: Cloud Native CI/CD](#chapter-6-cloud-native-cicd)
-- [  Chapter 7: ArgoCD](#chapter-7-argocd)
+1. [DevOps Overview](#devops-overview)
+
+- [What is DevOps?](#what-is-devops)
+- [Key DevOps Operations](#key-devops-operations)
+
+2. [Containers](#containers-reference)
+
+- [What is a Container?](#what-is-a-container)
+- [Containers' Building Blocks](#containers-building-blocks)
+
+3. [Github Actions](#github-actions)
+
+- [What is Github Actions?](#what-is-github-actions)
+- [Github Features](#github-features)
+- [Types of Actions](#types-of-actions)
+- [Github Actions Workflows](#github-actions-workflows)
+- [Components of Github Actions](#components-of-github-actions)
+- [More on Github Actions](#more-on-github-actions)
+- [Some Important Actions](#some-important-actions)
+
+4. [DevOps Directive Kubernetes Course](#devops-directive-kubernetes-course-link)
+
+- [Terminologies](#terminologies)
+- [Kubernetes Architecture](#kubernetes-architecture)
+- [Kubernetes System Components](#kubernetes-system-components)
+- [Setup Tools](#setup-tools)
+- [Built-in Kubernetes Resources](#built-in-kubernetes-resources)
+- [Helm](#helm)
+- [Demo Application](#demo-application)
+- [Extending the Kubernetes API](#extending-the-kubernetes-api)
+- [Auxiliary Tooling](#auxiliary-tooling)
+- [Developer Experience](#developer-experience)
+- [Debugging](#debugging)
+- [Deploying to Multiple Environments](#deploying-to-multiple-environments)
+- [Cluster/Node Upgrades](#clusternode-upgrades)
+- [CI/CD](#cicd)
+
+5. [GitOps](#gitops)
+
+- [What is GitOps?](#what-is-gitops)
+- [Perks of using GitOps](#perks-of-using-gitops)
+- [How does GitOps work?](#how-does-gitops-work)
+- [Working with Multiple Applications and Environments](#working-with-multiple-applications-and-environments)
+- [Secret Handling](#secret-handling)
+- [GitOps References](#gitops-references)
+
+6. [GitOps Cookbook](#gitops-cookbook-link)
+
+- [Chapter 1: Introduction](#chapter-1-introduction)
+- [Chapter 2: Requirements](#chapter-2-requirements)
+- [Chapter 3: Containers](#chapter-3-containers)
+- [Chapter 4: Kustomize](#chapter-4-kustomize)
+- [Chapter 5: Helm](#chapter-5-helm)
+- [Chapter 6: Cloud Native CI/CD](#chapter-6-cloud-native-cicd)
+- [Chapter 7: ArgoCD](#chapter-7-argocd)
+
+7. [Certified Kubernetes Application Developer (CKAD) Certification](#certified-kubernetes-application-developer-ckad-certification)
+
+- [About The Certification](#about-the-certification)
+- [Resources](#resources)
+
+8. [CKAD Udemy Course](#ckad-udemy-course-link)
+
+- [Section 1: Introduction](#section-1-introduction)
+- [Section 2: Core Concepts](#section-2-core-concepts)
+- [Section 3: Configuration](#section-3-configuration)
 
 ### DevOps Overview
 
@@ -151,43 +173,52 @@ In addition to default environment variables, you can use defined variables as c
 #### Some Important Actions
 
 1. actions/checkout:
+
    - Clones your repository to the GitHub Actions runner.
    - Checks out the specified ref (branch, tag, SHA).
    - Sets up Git credentials for subsequent Git operations.
    - Configures the Git environment for the workflow.
 
-  2. actions/setup-node:
-    - Sets up a Node.js environment for use in your workflow.
-    - Allows you to specify the Node.js version.
-    - Useful for installing dependencies and running JavaScript/TypeScript builds or tests.
+2. actions/setup-node:
 
-  3. actions/cache:
-    - Caches dependencies and build outputs to speed up workflow execution.
-    - Commonly used to cache package manager directories (e.g., npm, pip, Maven).
+   - Sets up a Node.js environment for use in your workflow.
+   - Allows you to specify the Node.js version.
+   - Useful for installing dependencies and running JavaScript/TypeScript builds or tests.
 
-  4. actions/upload-artifact & actions/download-artifact:
-    - Uploads and downloads build artifacts between workflow steps or jobs.
-    - Useful for sharing files (e.g., test reports, binaries) across jobs.
+3. actions/cache:
 
-  5. docker/build-push-action:
-    - Builds and pushes Docker images to a container registry.
-    - Supports advanced features like build caching and multi-platform builds.
+   - Caches dependencies and build outputs to speed up workflow execution.
+   - Commonly used to cache package manager directories (e.g., npm, pip, Maven).
 
-  6. actions/setup-python:
-    - Sets up a Python environment for your workflow.
-    - Allows you to specify the Python version and install dependencies.
+4. actions/upload-artifact & actions/download-artifact:
 
-  7. github/codeql-action:
-    - Runs CodeQL analysis for security and code quality scanning.
-    - Helps identify vulnerabilities in your codebase.
+   - Uploads and downloads build artifacts between workflow steps or jobs.
+   - Useful for sharing files (e.g., test reports, binaries) across jobs.
 
-  8. actions/github-script:
-    - Allows you to run custom JavaScript directly in your workflow.
-    - Useful for automating GitHub API calls or custom logic.
+5. docker/build-push-action:
 
-  For a comprehensive list, see the [GitHub Actions Marketplace](https://github.com/marketplace?type=actions).
+   - Builds and pushes Docker images to a container registry.
+   - Supports advanced features like build caching and multi-platform builds.
+
+6. actions/setup-python:
+
+   - Sets up a Python environment for your workflow.
+   - Allows you to specify the Python version and install dependencies.
+
+7. github/codeql-action:
+
+   - Runs CodeQL analysis for security and code quality scanning.
+   - Helps identify vulnerabilities in your codebase.
+
+8. actions/github-script:
+
+   - Allows you to run custom JavaScript directly in your workflow.
+   - Useful for automating GitHub API calls or custom logic.
+
+For a comprehensive list, see the [GitHub Actions Marketplace](https://github.com/marketplace?type=actions).
 
 **End of Github Actions!**
+
 ### DevOps Directive Kubernetes Course ([link](https://youtu.be/2T86xAtR6Fo?si=FrIHT84JCSGWPfY6))
 
 #### Terminologies
@@ -265,7 +296,9 @@ Kubernetes uses Docker images (OCI-compliant container images) as the standardiz
 - Namespace: provides a mechanism to logically group resources within a cluster. There are four initial namespaces: default, kube-system, kube-node-lease, kube-public.
   By default, namespaces DO NOT act as a network/security boundary.
 - Pods: the smallest deployable unit in Kubernetes. You almost never create a pod directly. Containers within a pod share networking and storage. Usually primary container, init containers (ran before primary container is run), and sidecar containers (run alongside primary container in perpetuity). To investigate a pod: `kubectl logs some-pod`. `kubectl get pods -o wide`
-  Pod -> ReplicaSet -> Deployment -> StatefulSet.
+
+  **Pod -> ReplicaSet -> Deployment -> StatefulSet**
+
 - ReplicaSet: creates replica instances of the pods at all time. labels are the link between ReplicaSet and Pods.
 - Deployment: adds the concept of rollouts and rollbacks to ReplicaSet. Used for long-running stateless applications.
 - Service: an internal load balancer across replicas. It routes network traffic. Uses pod labels to determine which pods to serve. Types: ClusterIP (internal), NodePort (listens on each node in cluster), LoadBalancer (provisions external load balancer with cloud provider)
@@ -300,12 +333,14 @@ Kubernetes uses Docker images (OCI-compliant container images) as the standardiz
 - Ingress resources define rules (e.g., "traffic to `/api` goes to Service A, `/web` goes to Service B"). Services here are the different application components.
 
   Typical flow of a request:
+
   ```
   External Request → Load Balancer → Ingress Controller → Single Ingress Resource
                                               ├── /api → Backend Service → Backend Pods
                                               ├── /web → Frontend Service → Frontend Pods
                                               └── /admin → Admin Service → Admin Pods
   ```
+
 - Ingress requires an **Ingress Controller** (like NGINX, Traefik, or HAProxy) to actually implement the routing logic.
 
 **Important Summary:**
@@ -685,19 +720,20 @@ Argo CD has three phases (resource hooks) when applying resources: the first pha
 
 Overview of the available hooks:
 
-| Hook | Description | Use case |
-|------|-------------|----------|
-| PreSync | Executes prior to the application of the manifests | Database migrations |
-| Sync | Executes at the same time as manifests | Complex rolling update strategies like canary releases or dark launches |
-| PostSync | Executes after all Sync hooks have completed and were successful (healthy) | Run tests to validate deployment was correctly done |
-| SyncFail | Executes when the sync operation fails | Rollback operations in case of failure |
-| Skip | Skip the application of the manifest | When manual steps are required to deploy the application (i.e., releasing public traffic to new version) |
+| Hook     | Description                                                                | Use case                                                                                                 |
+| -------- | -------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| PreSync  | Executes prior to the application of the manifests                         | Database migrations                                                                                      |
+| Sync     | Executes at the same time as manifests                                     | Complex rolling update strategies like canary releases or dark launches                                  |
+| PostSync | Executes after all Sync hooks have completed and were successful (healthy) | Run tests to validate deployment was correctly done                                                      |
+| SyncFail | Executes when the sync operation fails                                     | Rollback operations in case of failure                                                                   |
+| Skip     | Skip the application of the manifest                                       | When manual steps are required to deploy the application (i.e., releasing public traffic to new version) |
 
 A sync wave is a way to order how Argo CD applies the manifests stored in Git. All manifests have zero waves by default, and the lower values go first. You can use the `argocd.argoproj.io/sync-wave` annotation to set the wave number to a resource.
 
 For example, you might want to deploy a database first and then create the database schema; for this case, you should set a sync-wave lower in the database deployment file than in the job for creating the database schema.
 
 When Argo CD starts applying the manifests, it orders the resources in the following way:
+
 1. Phase
 2. Wave (lower precedence first)
 3. Kind
@@ -705,3 +741,478 @@ When Argo CD starts applying the manifests, it orders the resources in the follo
 
 **End of GitOps Cookbook!**
 
+### Certified Kubernetes Application Developer (CKAD) Certification
+
+#### About The Certification
+
+The [Certified Kubernetes Application Developer (CKAD) certification](https://training.linuxfoundation.org/certification/certified-kubernetes-application-developer-ckad/) is a performance-based exam designed to validate a candidate's ability to design, build, and run applications on Kubernetes. It focuses on core concepts such as configuration, multi-container pods, observability, pod design, services, networking, and state persistence. The exam is hands-on and requires practical knowledge of Kubernetes resources, YAML manifest creation, and troubleshooting skills, making it ideal for developers who want to demonstrate their proficiency in deploying and managing applications in Kubernetes environments.
+
+#### Resources
+
+There are many ways to help prepare you for the [CKAD exam](https://training.linuxfoundation.org/certification/certified-kubernetes-application-developer-ckad/), the following notes are based on this [udemy course](https://udemy.com/course/certified-kubernetes-application-developer) with its practical labs from [KodeKloud](https://kodekloud.com/).
+
+For practice exams, [killer.sh](https://killer.sh/) and [acloud.guru](http://acloud.guru/) are the go to.
+
+### CKAD Udemy Course [(link)](https://udemy.com/course/certified-kubernetes-application-developer)
+
+#### Section 1: Introduction
+
+All introductory concepts are already covered with my other notes above. Be sure to be comfortable with the concepts above.
+
+In the following sections, **I have only included new information, mainly commands, tips and tricks, and the practical side of Kubernetes**. Be sure to get your hands dirty, preferably follow the practical labs from [KodeKloud](https://kodekloud.com/).
+
+#### Section 2: Core Concepts
+
+##### Container Runtimes
+
+Support for docker as Kubernete's container runtime (through dockershim) was removed version 1.24. This meant only CRI runtimes (e.g., containerd) could be used.
+
+CLI tools to interact with containers:
+
+| Tool        | Description                                                              | Use Case                                       | Supported Runtimes        | CLI Syntax Example             |
+| ----------- | ------------------------------------------------------------------------ | ---------------------------------------------- | ------------------------- | ------------------------------ |
+| **ctr**     | Low-level CLI for containerd; exposes containerd’s API directly.         | Advanced debugging, scripting, direct control. | containerd                | `ctr images pull nginx:latest` |
+| **nerdctl** | Docker-compatible CLI for containerd; supports Docker-like commands.     | Docker-like workflows with containerd backend. | containerd                | `nerdctl run -d nginx:latest`  |
+| **crictl**  | CLI for CRI-compatible runtimes (containerd, CRI-O); Kubernetes-focused. | Debugging Kubernetes nodes, troubleshooting.   | containerd, CRI-O, others | `crictl pods`                  |
+
+**Summary:**
+
+- `ctr` is for direct, low-level containerd operations.
+- `nerdctl` is for users familiar with Docker CLI, but using containerd.
+- `crictl` is for interacting with Kubernetes container runtimes via the CRI.
+
+##### YAML Manifests
+
+**The required YAML fields for a Kubernetes object are:**
+
+1. `apiVersion`: Specifies the version of the Kubernetes API to use for the object.
+2. `kind`: Specifies the type of Kubernetes object (e.g., Pod, Deployment, Service).
+3. `metadata`: Provides data that helps uniquely identify the object, including a `name` and optionally `namespace`, `labels`, etc.
+4. `spec`: Defines the desired state and configuration for the object.
+
+Example:
+
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: my-pod
+spec:
+  containers:
+    - name: my-container
+      image: nginx
+```
+
+##### Pod Definitions
+
+If you are not given a pod definition file, you may extract the definition to a file using the below command:
+
+`kubectl get pod <pod-name> -o yaml > pod-definition.yaml`
+
+To modify the properties of the pod, you can utilize the `kubectl edit pod <pod-name>` command. Please note that only the properties listed below are editable.
+
+- spec.containers[*].image
+
+- spec.initContainers[*].image
+
+- spec.activeDeadlineSeconds
+
+- spec.tolerations
+
+- spec.terminationGracePeriodSeconds
+
+With Deployments, however, you can easily edit ANY field/property of the POD template. Since the pod template is a child of the deployment specification, with every change the deployment will automatically delete and create a new pod with the new changes. So if you are asked to edit a property of a POD part of a deployment you may do that simply by running the command:
+
+```
+kubectl edit deployment my-deployment
+```
+
+##### Scaling ReplicaSets
+
+To scale up a ReplicaSet, you can use the `kubectl scale` command and specify the desired number of replicas. For example, to scale a ReplicaSet named `my-replicaset` to 5 replicas:
+
+```
+kubectl replace -f replicaset.yaml
+```
+
+**Tip:** For minor changes, consider using `kubectl apply` (declarative) or `kubectl edit` (interactive) instead of `replace`, as `replace` will overwrite the entire resource.
+
+Alternatively, you can use the scale command, but the manifest file would not be updated.
+
+```
+kubectl scale replicaset my-replicaset --replicas=5
+```
+
+Alternatively, you can edit the ReplicaSet manifest and update the `spec.replicas` field, then apply the changes:
+
+```
+export KUBE_EDITOR="nano" # otherwise, vi will be used..
+kubectl edit replicaset my-replicaset
+```
+
+Change the `replicas` value under `spec` and save the file.
+
+**Note:** Deployments manage ReplicaSets automatically, so it's recommended to scale Deployments instead of ReplicaSets directly in most cases.
+
+##### Cluster DNS
+
+Kubernetes provides built-in DNS-based service discovery for workloads running in the cluster. The DNS add-on (usually CoreDNS) automatically creates DNS records for Services and Pods, allowing applications to refer to each other by name.
+
+- **Service DNS:** Each Service gets a DNS entry in the form `<service-name>.<namespace>.svc.cluster.local`. For example, a Service named `backend` in the `default` namespace is accessible at `backend.default.svc.cluster.local`.
+- **Pod DNS:** Pods can also be assigned DNS records, but direct Pod addressing is less common.
+- **Automatic Resolution:** Applications can use just the Service name if they're in the same namespace, or the fully qualified domain name (FQDN) for cross-namespace communication.
+
+**Example:**
+If a Deployment's Pods need to connect to a database Service called `postgres` in the `db` namespace, they can use the address: `postgres.db.svc.cluster.local`.
+
+**Note:** CoreDNS is the default DNS provider in modern Kubernetes clusters. You can check DNS resolution by running `nslookup <service-name>` or `dig <service-name>` from within a Pod.
+
+**Troubleshooting:** If DNS resolution fails, check that the CoreDNS pods are running (`kubectl get pods -n kube-system -l k8s-app=kube-dns`) and that your Pod's DNS config is correct.
+
+Switch namespaces manually (without kubens) using this command:
+
+```
+kubectl config set-context --current --namespace=<namespace-name>
+```
+
+##### Creating Manifest Files on The Run
+
+`--dry-run`: By default, as soon as the command is run, the resource will be created.
+
+If you simply want to test your command, use the `--dry-run=client` option. This will not create the resource. Instead, tell you whether the resource can be created and if your command is right.
+
+`-o yaml`: This will output the resource definition in YAML format on the screen.
+
+Use the above two in combination along with Linux output redirection to generate a resource definition file quickly, that you can then modify and create resources as required, instead of creating the files from scratch.
+
+```
+kubectl run nginx --image=nginx --dry-run=client -o yaml > nginx-pod.yaml
+```
+
+Similarly for other resource types:
+
+```
+kubectl create deployment --image=nginx nginx --dry-run -o yaml
+```
+
+Notice how run is used for Pods and create for all other resources.
+
+Create a Service named redis-service of type ClusterIP to expose pod redis on port 6379:
+
+```
+kubectl expose pod redis --port=6379 --name redis-service --dry-run=client -o yaml
+```
+
+The above will automatically use the pod's labels as selectors.
+
+Or:
+
+```
+kubectl create service clusterip redis --tcp=6379:6379 --dry-run=client -o yaml
+```
+
+This will not use the pods' labels as selectors; instead it will assume selectors as app=redis. You cannot pass in selectors as an option. So it does not work well if your pod has a different label set. So generate the file and modify the selectors before creating the service.
+
+Now, what if you want to create a Service named nginx of type NodePort to expose pod nginx's port 80 on port 30080 on the nodes:
+
+```
+kubectl expose pod nginx --port=80 --name nginx-service --type=NodePort --dry-run=client -o yaml
+```
+
+Or
+
+```
+kubectl create service nodeport nginx --tcp=80:80 --node-port=30080 --dry-run=client -o yaml
+```
+
+Both the above commands have their own challenges. While one of it cannot accept a node port the other cannot accept a selector. I would recommend going with the `kubectl expose` command. If you need to specify a node port, generate a definition file using the same command and manually input the nodeport before creating the service.
+
+##### Overriding Docker Image ENTRYPOINT and CMD in Kubernetes
+
+In Kubernetes, when you specify a command in the Pod spec (under containers[].command), it overrides the Docker image’s ENTRYPOINT.
+
+If you specify args (under containers[].args), it overrides the Docker image’s CMD.
+
+**End of Section 2: Core Concepts!**
+
+#### Section 3: Configuration
+
+##### ConfigMaps and Secrets
+
+ConfigMaps and Secrets allow a way to pass variables to Pods. The only difference is that a Secret is base64 encoded and is supposed to be used for sensitive data. You can still easily access the Secret data as its NOT encrypted by default.
+
+You can (and should) encrypt Secrets at Rest in etcd by following the [documentation](https://kubernetes.io/docs/tasks/administer-cluster/encrypt-data/).
+
+##### Service Accounts
+
+By default, every Pod in Kubernetes is assigned a ServiceAccount named `default` in its namespace. The ServiceAccount's credentials (a token and CA certificate) are automatically mounted into the Pod at `/var/run/secrets/kubernetes.io/serviceaccount`. This allows applications running inside the Pod to authenticate to the Kubernetes API server.
+
+You can specify a different ServiceAccount for a Pod by setting the `serviceAccountName` field in the Pod spec. If you do not want any ServiceAccount token to be mounted, set `automountServiceAccountToken: false` in the Pod or ServiceAccount spec.
+
+**Example:**
+
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+   name: mypod
+spec:
+   serviceAccountName: my-custom-sa
+   containers:
+      - name: app
+         image: nginx
+```
+
+**Key Points:**
+
+- ServiceAccounts are used for Pod-to-API authentication.
+- The default ServiceAccount is used unless overridden.
+- Tokens are mounted as files in the Pod by default.
+- You can create custom ServiceAccounts and bind roles to them for fine-grained access control.
+- To list ServiceAccounts: `kubectl get serviceaccounts`
+- To describe a ServiceAccount: `kubectl describe serviceaccount <name>`
+
+##### Service Account Token: Secret Object vs TokenRequest API
+
+**Legacy Secret-based Tokens:**
+
+- Traditionally, when a ServiceAccount is created, Kubernetes automatically generates a long-lived Secret of type `kubernetes.io/service-account-token`.
+- This Secret contains a JWT token and is mounted into Pods using that ServiceAccount.
+- The token is static (does not expire) and is stored as a Secret resource in the namespace.
+- Example:
+  ```yaml
+  apiVersion: v1
+  kind: Secret
+  type: kubernetes.io/service-account-token
+  metadata:
+    name: my-sa-token-xxxxx
+    annotations:
+      kubernetes.io/service-account.name: my-sa
+  ```
+- Drawbacks: Tokens are long-lived, cannot be easily revoked, and are visible as Secrets.
+
+**TokenRequest API (Bound Service Account Tokens):**
+
+- Introduced in Kubernetes 1.22+ for improved security.
+- Tokens are created on-demand via the TokenRequest API (`/api/v1/namespaces/{namespace}/serviceaccounts/{name}/token`).
+- These tokens are short-lived (default 1 hour), can be audience-bound, and are not stored as Secrets.
+- Used by projected service account token volumes and for external systems needing a token.
+- Example (kubectl):
+  ```bash
+  kubectl create token my-sa --duration=10m
+  ```
+- Benefits: Tokens are ephemeral, can be audience-restricted, and are not persisted in etcd.
+
+**Historical Importance:**
+
+In older Kubernetes versions, the default ServiceAccount had a secret with a static token mounted into Pods automatically. However, starting from Kubernetes 1.24 (and more fully in 1.25+), the ServiceAccount Token Volume Projection mechanism is used by default.
+
+This means:
+
+- Instead of mounting a static token secret, Kubernetes uses the TokenRequest API to dynamically request a short-lived token for the ServiceAccount.
+- This token is projected into the Pod via a volume mount and is automatically refreshed.
+- This approach improves security by avoiding long-lived static tokens.
+
+**Best Practice:**
+
+Prefer using the TokenRequest API and projected service account tokens for improved security and token management.
+
+##### Resource Requirements
+
+It is best practice to have at least requests of the pod set to guarantee its resources. If both limits and requests are not set, any pod can consume all available resources and starve the other pods in the node.
+
+If both limits and requests are set, Kubernetes will ensure that the pod gets at least the requested resources, but will not allow it to exceed the specified limits. If a container tries to use more than its limit, it will be throttled (for CPU) or terminated (for memory), even if the resources are available and unused in the node.
+
+**Example:**
+
+```yaml
+resources:
+  requests:
+    memory: '64Mi'
+    cpu: '250m'
+  limits:
+    memory: '128Mi'
+    cpu: '500m'
+```
+
+- `requests`: The minimum amount of resources guaranteed for the container.
+- `limits`: The maximum amount of resources the container can use.
+
+**Key Points:**
+
+- If only `limits` are set, `requests` default to `limits`.
+- If only `requests` are set, there is no upper bound; the container can use more if available.
+
+**Commands:**
+
+- To view resource usage:  
+   `kubectl top pod <pod-name>`
+- To describe resource requests/limits:  
+   `kubectl describe pod <pod-name>`
+
+**LimitRange:**
+
+LimitRange is a Kubernetes resource that enforces default and maximum/minimum resource requests and limits for Pods or Containers within a namespace. This helps ensure that all workloads in a namespace have appropriate resource constraints, preventing resource starvation or overconsumption.
+
+**Example:**
+
+```yaml
+apiVersion: v1
+kind: LimitRange
+metadata:
+   name: mem-cpu-limit-range
+spec:
+   limits:
+      - default:
+            cpu: 500m
+            memory: 256Mi
+         defaultRequest:
+            cpu: 250m
+            memory: 128Mi
+         type: Container
+```
+
+**ResourceQuota:**
+
+ResourceQuota is a Kubernetes resource that sets aggregate resource limits (such as CPU, memory, number of objects) for a namespace. It helps prevent a single team or workload from consuming all resources in a shared cluster.
+
+**Example:**
+
+```yaml
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: compute-resources
+spec:
+  hard:
+    pods: '10'
+    requests.cpu: '4'
+    requests.memory: 8Gi
+    limits.cpu: '8'
+    limits.memory: 16Gi
+```
+
+**Key Points:**
+
+- ResourceQuotas are applied per namespace.
+- If a quota is exceeded, new resources (pods, services, etc.) cannot be created until usage drops below the quota.
+- Use `kubectl describe quota` to view current usage and limits.
+
+**Best Practice:**
+
+Combine `LimitRange` and `ResourceQuota` to enforce both per-container and per-namespace resource constraints.
+
+##### Taints and Tolerations
+
+Taints and tolerations work together to control which pods can be scheduled on which nodes in a Kubernetes cluster.
+
+- **Taints** are applied to nodes and allow a node to repel a set of pods unless those pods explicitly tolerate the taint.
+- **Tolerations** are applied to pods and allow (but do not require) the pods to be scheduled onto nodes with matching taints.
+
+**Taint Example:**
+
+```bash
+kubectl taint nodes node1 key=value:NoSchedule
+```
+
+This command adds a taint to `node1` with key `key`, value `value`, and effect `NoSchedule`. Pods without a matching toleration will not be scheduled on this node.
+
+**Toleration Example:**
+
+```yaml
+tolerations:
+   - key: "key"
+      operator: "Equal"
+      value: "value"
+      effect: "NoSchedule"
+```
+
+Add this toleration to a pod spec to allow it to be scheduled on nodes with the above taint.
+
+**Taint Effects:**
+
+- `NoSchedule`: Pod will not be scheduled on the node unless it tolerates the taint.
+- `PreferNoSchedule`: Kubernetes will try to avoid placing a pod on the node unless necessary.
+- `NoExecute`: Existing pods that do not tolerate the taint will be evicted from the node.
+
+**Key Points:**
+
+- Taints are for nodes; tolerations are for pods.
+- Tolerations do not guarantee scheduling on tainted nodes—they only allow it.
+- Use taints and tolerations to dedicate nodes to specific workloads or to isolate critical applications.
+
+**Commands:**
+
+- List taints on a node:  
+   `kubectl describe node <node-name>`
+- Remove a taint:  
+   `kubectl taint nodes node1 key:NoSchedule-`
+
+##### Node Selectors and Node Affinity
+
+Node selectors and node affinity are mechanisms to influence pod scheduling onto specific nodes.
+
+**Node Selector**
+
+- The simplest way to constrain a pod to run on particular nodes.
+- Uses node labels to select nodes.
+
+**Example:**
+
+```yaml
+spec:
+  nodeSelector:
+    disktype: ssd
+```
+
+This pod will only be scheduled on nodes labeled `disktype=ssd`.
+
+**Node Affinity**
+
+- More expressive than nodeSelector.
+- Supports required (hard) and preferred (soft) rules.
+- Defined under `affinity.nodeAffinity` in the pod spec.
+
+**Types:**
+
+- `requiredDuringSchedulingIgnoredDuringExecution`: Pod is scheduled only if rules are met (hard requirement).
+- `preferredDuringSchedulingIgnoredDuringExecution`: Scheduler tries to place the pod on matching nodes, but will use others if none match (soft preference).
+
+**Example:**
+
+```yaml
+spec:
+   affinity:
+      nodeAffinity:
+         requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+               - matchExpressions:
+                     - key: disktype
+                        operator: In
+                        values:
+                           - ssd
+         preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 1
+               preference:
+                  matchExpressions:
+                     - key: zone
+                        operator: In
+                        values:
+                           - us-east-1a
+```
+
+**Key Points:**
+
+- Use nodeSelector for simple, single-label constraints.
+- Use node affinity for complex, multi-label, or preference-based scheduling.
+- Both mechanisms help ensure pods run on appropriate nodes for performance, compliance, or hardware requirements.
+- Node affinity is recommended over nodeSelector for new workloads.
+
+**Commands:**
+
+- Add a label to a node:  
+   `kubectl label nodes <node-name> <key>=<value>`
+- View node labels:  
+   `kubectl get nodes --show-labels`
+
+**End of Section 3: Configuration!**
