@@ -52,26 +52,21 @@ _Have fun.. and remember, do not get stuck in tutorial hell :)_
 - [Secret Handling](#secret-handling)
 - [GitOps References](#gitops-references)
 
-6. [GitOps Cookbook](#gitops-cookbook-link)
-
-- [Chapter 1: Introduction](#chapter-1-introduction)
-- [Chapter 2: Requirements](#chapter-2-requirements)
-- [Chapter 3: Containers](#chapter-3-containers)
-- [Chapter 4: Kustomize](#chapter-4-kustomize)
-- [Chapter 5: Helm](#chapter-5-helm)
-- [Chapter 6: Cloud Native CI/CD](#chapter-6-cloud-native-cicd)
-- [Chapter 7: ArgoCD](#chapter-7-argocd)
-
-7. [Certified Kubernetes Application Developer (CKAD) Certification](#certified-kubernetes-application-developer-ckad-certification)
+6. [Certified Kubernetes Application Developer (CKAD) Certification](#certified-kubernetes-application-developer-ckad-certification)
 
 - [About The Certification](#about-the-certification)
 - [Resources](#resources)
 
-8. [CKAD Udemy Course](#ckad-udemy-course-link)
+7. [CKAD Udemy Course](#ckad-udemy-course-link)
 
 - [Section 1: Introduction](#section-1-introduction)
 - [Section 2: Core Concepts](#section-2-core-concepts)
 - [Section 3: Configuration](#section-3-configuration)
+- [Section 4: Multi-Container Pods](#section-4-multi-container-pods)
+- [Section 5: Observability](#section-5-observability)
+- [Section 6: Pod Design](#section-6-pod-design)
+- [Section 7: Services & Networking](#section-7-services--networking)
+- [Section 8: State Persistence](#section-8-state-persistence)
 
 ### DevOps Overview
 
@@ -577,170 +572,6 @@ _There are no GitOps engineers. GitOps is not a role (and neither is DevOps). Gi
 
 **End of GitOps!**
 
-### GitOps Cookbook ([link](https://developers.redhat.com/e-books/gitops-cookbook))
-
-#### Chapter 1: Introduction
-
-#### Intro
-
-GitOps is a methodology and practice that uses Git repositories as a single source of truth to deliver infrastructure as code. It takes the pillars and approaches from DevOps culture and provides a framework to start realizing the results. The relationship between DevOps and GitOps is close, as GitOps has become the popular choice to implement and enhance DevOps, platform engineering, and SRE.
-CI/CD pipelines are one of the most common use cases for GitOps.
-
-The three main pillars of GitOps are:
-
-- Git is the single source of truth
-- Treat everything as code
-- Operations are performed through Git workflows
-
-**Some Terms:**
-
-_Declarative_: A system managed by GitOps must have its desired state expressed declaratively.
-_Versioned and immutable_: The desired state is stored in a way that enforces immutability and versioning and retains a complete version history.
-_Pulled automatically_: Software agents automatically pull the desired state declarations from the source.
-_Continuously reconciled_: Software agents continuously observe the actual system state and attempt to apply the desired state.
-
-#### Kubernetes CICD
-
-In a typical CI/CD pipeline, submitted code checks the CI process while the CD process checks and applies requirements for things like security, infrastructure as code, or any other boundaries set for the application framework. All code changes are tracked, making updates easy while also providing version control should a rollback be needed. CD is the GitOps domain and it works together with the CI part to deploy apps in multiple environments.
-
-With Kubernetes, it’s easy to implement an in-cluster CI/CD pipeline. You can have CI software create the container image representing your application and store it in a container image registry. Afterward, a Git workflow such as a pull request can change the Kubernetes manifests illustrating the deployment of your apps and start a CD sync loop.
-
-![Model Diagram](images/model.png)
-
-#### App Deployment
-
-As GitOps is an agnostic, platform-independent approach, the application deployment model on Kubernetes can be either in-cluster or multicluster. An external
-GitOps tool can use Kubernetes just as a target platform for deploying apps. At the same time, in-cluster approaches run a GitOps engine inside Kubernetes to deploy apps and sync manifests in one or more Kubernetes clusters.
-
-The GitOps engine takes care of the CD part of the CI/CD pipeline and accomplishes
-_Deploy_: Deploy the manifests from Git.
-
-_Monitor_: Monitor either the Git repo or the cluster state.
-
-_Detect Drift_: Detect any change from what is described in Git and what is present in the cluster.
-
-_Take Action_: Perform an action that reflects what is on Git (rollback or three-way diff). Git is the source of truth, and any change is performed via a Git workflow.
-
-![GitOps Loop](images/loop.png)
-
-_Cultural Change in IT Organizations Needed_: The “Teaching Elephants to Dance (and Fly!)” speech from Burr Sutter gives a clear idea of the context. The elephant is where your organization is today. There are phases of change between traditional and modern environments powered by GitOps
-tools. Some organizations have the luxury of starting from scratch, but for many
-businesses, the challenge is teaching their lumbering elephant to dance like a graceful
-ballerina.
-
-#### Chapter 2: Requirements
-
-#### Minikube
-
-Minikube is a tool that simplifies running a Kubernetes cluster locally on a single machine. In the case of Minikube, the entire Kubernetes cluster (control plane and worker node) is installed inside a VM or container. This is a special case for local development and testing, not a production setup. In essence, the Kubernetes cluster is installed inside a VM or container, and it orchestrates containers from there.
-
-Kubernetes is well known as a container orchestration platform to deploy and manage apps. However, it doesn’t include support for building container images out-of-the-box. Indeed, according to Kubernetes documentation: “(Kubernetes) Does not deploy source code and does not build your application. Continuous Integration, Delivery, and Deployment (CI/CD) workflows are determined by organization cultures and preferences as well as technical requirements.
-
-#### Chapter 3: Containers
-
-Shipwright is an extensible framework for building container images on Kubernetes. It supports popular tools such as Buildah, Cloud Native Buildpacks, and kaniko. It uses Kubernetes-style APIs, and it runs workloads using Tekton.
-
-kaniko is another dockerless solution to build container images from a Dockerfile inside a container or Kubernetes cluster. Shipwright brings additional APIs to Kubernetes to use tools such as kaniko to create container images, acting as an abstract layer that can be considered an extensible building system for Kubernetes.
-
-Some key concepts in Shipwright, which are defined using Kubernetes Custom Resource Definitions (CRDs). Each CRD represents a specific part of the build process (defined with a unique yaml file):
-
-1. ClusterBuildStrategy
-   - What it is: This defines how the build will be executed. It specifies the steps and tools to use for building a container image.
-   - Example: You might use a ClusterBuildStrategy for tools like Kaniko, Buildah, or Cloud Native Buildpacks. It describes the process of building an image, such as which Dockerfile to use, what commands to run, and how to push the image to a registry.
-   - Scope: It is cluster-wide, meaning it can be used by builds in any namespace.
-2. Build
-   - What it is: This defines what to build and where to push the resulting container image. It references a ClusterBuildStrategy to specify how the build should be executed.
-   - Key Details: Specifies the source code (e.g., a Git repository). Specifies the output image (e.g., the container registry and image name). Links to a ClusterBuildStrategy to define the build process.
-   - Example: A Build object might say, "Take the code from this Git repository, use the Kaniko strategy, and push the resulting image to Docker Hub."
-3. BuildRun
-   - What it is: This represents the actual execution of a build. When you create a BuildRun object, it triggers the build process defined in the Build object.
-   - Key Details: It uses the Build object as a template. It creates a Kubernetes Pod to execute the build process. Once the BuildRun is complete, the container image is pushed to the specified registry.
-   - Example: A BuildRun object might say, "Run the build defined in the Build object named my-app-build."
-
-#### Chapter 4: Kustomize
-
-Deploying to a Kubernetes cluster is, in summary, applying some YAML files and checking the result.
-
-The hard part is developing the initial YAML files version; after that, usually, they suffer only small changes such as updating the container image tag version, the number of replicas, or a new configuration value. One option is to make these changes directly in the YAML files—it works, but any error in this version (modification of the wrong line, deleting something by mistake, putting in the wrong whitespace) might be catastrophic.
-
-For this reason, some tools let you define base Kubernetes manifests (which change infrequently) and specific files (maybe one for each environment) for setting the parameters that change more frequently. One of these tools is Kustomize.
-
-#### Chapter 5: Helm
-
-Helm works similarly to Kustomize, but it’s a template solution and acts more like a package manager, producing artifacts that are versionable, sharable, or deployable.
-
-One of the differences between Kustomize and Helm is the concept of a Chart. A Chart is a packaged artifact that can be shared and contains multiple elements like dependencies on other Charts. Additionally, in contrast to Kustomize, which can be used either within the kubectl command or as a standalone CLI tool, Helm needs to be downloaded and installed in your local machine.
-
-Sample Helm project:
-![Helm Rlationship](images/helm-relationship.png)
-If you have multiple environments, you would simply have multiple `values.yaml` files.
-
-#### Chapter 6: Cloud Native CI/CD
-
-Cloud native refers to the model where cloud computing and cloud services are involved in this process. Examples include Tekton, Drone, and Github Actions.
-
-#### Chapter 7: ArgoCD
-
-CD is all about how to deploy an application to an environment (a Kubernetes cluster) using the GitOps methodology and not creating a script running kubectl/helm commands.
-
-As Daniel Bryant puts it, “If you weren’t using SSH in the past to deploy your application in production, don’t use kubectl to do it in Kubernetes.”
-
-A typical operation done in Kubernetes is a rolling update to a new version of the container, and ArgoCD integrates with another tool (e.g., Kustomize or Helm) to make this process smooth.
-
-An application in ArgoCD is composed of three Kubernetes manifest files, including a Namespace, a Deployment, and a Service definition.
-
-ArgoCD treats Git repositories as the single source of truth for Kubernetes deployments.
-
-**Sync Process:**
-
-1. **Monitors** GitHub repo for changes (polls every 3 minutes or via webhooks)
-2. **Fetches** YAML manifests from Git and caches temporarily
-3. **Detects drift** between cluster state and Git declarations
-4. **Applies manifests** to Kubernetes cluster using kubectl
-5. **Persists resources** in cluster's etcd database
-
-**Workflow:**
-
-Code Push → ArgoCD Detects → Fetch Manifests → Apply to Cluster → Resources Stored
-
-With a pure Argo CD solution, after the container image is published to a container registry, we need to update the Kubernetes/Kustomize/Helm manifest files pointing
-to the new container image and push the result to the Git repository. This is usually done during the continuous integration phase via Github Actions.
-
-Although this approach works, it could be automated so the cluster
-could detect a new image pushed to the container registry and update the current deployment file pointing to the newer version.
-ArgoCD IU is a Kubernetes controller monitoring for a new container version and updating the manifests (i.e., versions) defined in the ArgoCD YAML file. It then commits those changes to the Git repository, which triggers Argo CD to deploy the new version of the image.
-
-Using Github Actions to handle the update of versions in the Kubernetes manifests (e.g., ArgoCD YAML file) to point to the new versions is simpler and preferred (by myself, at least).
-
-ArgoCD IU Lifecycle:
-
-![ArgoCD IU Lifecycle](images/argocdiu.png)
-
-Argo CD has three phases (resource hooks) when applying resources: the first phase is executed before applying the manifests (PreSync), the second phase is when the manifests are applied (Sync), and the third phase is executed after all manifests are applied and synchronized (PostSync).
-
-Overview of the available hooks:
-
-| Hook     | Description                                                                | Use case                                                                                                 |
-| -------- | -------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
-| PreSync  | Executes prior to the application of the manifests                         | Database migrations                                                                                      |
-| Sync     | Executes at the same time as manifests                                     | Complex rolling update strategies like canary releases or dark launches                                  |
-| PostSync | Executes after all Sync hooks have completed and were successful (healthy) | Run tests to validate deployment was correctly done                                                      |
-| SyncFail | Executes when the sync operation fails                                     | Rollback operations in case of failure                                                                   |
-| Skip     | Skip the application of the manifest                                       | When manual steps are required to deploy the application (i.e., releasing public traffic to new version) |
-
-A sync wave is a way to order how Argo CD applies the manifests stored in Git. All manifests have zero waves by default, and the lower values go first. You can use the `argocd.argoproj.io/sync-wave` annotation to set the wave number to a resource.
-
-For example, you might want to deploy a database first and then create the database schema; for this case, you should set a sync-wave lower in the database deployment file than in the job for creating the database schema.
-
-When Argo CD starts applying the manifests, it orders the resources in the following way:
-
-1. Phase
-2. Wave (lower precedence first)
-3. Kind
-4. Name
-
-**End of GitOps Cookbook!**
-
 ### Certified Kubernetes Application Developer (CKAD) Certification
 
 #### About The Certification
@@ -1216,3 +1047,836 @@ spec:
    `kubectl get nodes --show-labels`
 
 **End of Section 3: Configuration!**
+
+#### Section 4: Multi-Container Pods
+
+Following a microservices architecture, its best practice to separate services as much as possible. For example, for a web server and a logging agent, you would not want to merge them as they function differently. You would want the two to be deployed separately but for them to work together. That can be achieved by placing the two in the same pod, sharing the same lifecycle, network, and resources. In a multi-container pod, each container is expected to run a process that stays alive as long as the pod's lifecycle.
+
+##### Design Patterns
+
+There are three common multi-container pod design patterns in Kubernetes: **sidecar**, **adapter**, and **ambassador**. Each pattern addresses a different use case for running multiple containers together in a single pod.
+
+##### Sidecar Pattern
+
+A **sidecar** container extends or enhances the primary application container. It shares the pod's storage and network, allowing it to augment the main container's functionality without modifying its code.
+
+**Implementation note:**
+
+Starting with Kubernetes v1.29, sidecar containers are implemented as restartable init containers by setting `restartPolicy: Always`, and are placed under the `initContainers` field. This approach ensures that sidecar containers start before and are terminated after the main application containers and continue running throughout the Pod's lifecycle.
+
+When a pod is first created the initContainer is run, and the process in the initContainer must run to a completion before the real container hosting the application starts.
+
+You can configure multiple such initContainers as well, like how we did for multi-pod containers. In that case each init container is run one at a time in sequential order.
+
+**Co-located containers** refer to multiple containers running within the same Pod that collaborate to achieve a common goal. That is the new term now used to distinguish what was previously referred to as a sidecar before the Kubernetes v1.29 updates. Unlike sidecar containers, co-located containers often share equal responsibility in the application's functionality. They can start and stop independently and may not have a defined startup order.
+
+**Use cases:**
+
+- Log shippers (e.g., forwarding logs to a central system)
+- Proxies for TLS termination
+- Automatic configuration reloaders
+
+**Example:**  
+A web server container with a sidecar container running a log forwarder.
+
+##### Adapter Pattern
+
+An **adapter** container transforms data or interfaces between the main application and other systems. It acts as a translator, converting output from the main container into a format required by external systems.
+
+**Use cases:**
+
+- Converting application logs to a standard format
+- Translating metrics for monitoring systems
+
+**Example:**  
+A container that reads logs from a shared volume and reformats them before sending to a monitoring service.
+
+##### Ambassador Pattern
+
+An **ambassador** container acts as a proxy between the main application and the outside world (or other services). It handles communication, such as routing, load balancing, or protocol translation.
+
+**Use cases:**
+
+- Connecting to external databases or APIs
+- Injecting service mesh proxies (e.g., Envoy, Istio sidecars)
+
+**Example:**  
+A database proxy container that manages secure connections to an external database on behalf of the main application.
+
+**Design Patterns Summary Table:**
+
+| Pattern    | Purpose                                     | Example Use Case                 |
+| ---------- | ------------------------------------------- | -------------------------------- |
+| Sidecar    | Augment/extend main container functionality | Log forwarding, config reload    |
+| Adapter    | Transform data/interface for compatibility  | Log/metrics format conversion    |
+| Ambassador | Proxy/mediate external communication        | Database/API proxy, service mesh |
+
+These patterns help structure multi-container pods for modularity, reusability, and separation of concerns.
+
+**End of Section 4: Multi-Container Pods**
+
+#### Section 5: Observability
+
+##### Readiness and Liveness Probes
+
+Kubernetes uses probes to determine the health and availability of containers in a Pod. The two most common types are **readiness** and **liveness** probes.
+
+**Readiness Probe**
+
+- Indicates if a container is _ready_ to accept traffic.
+- If the readiness probe fails, the Pod is removed from Service endpoints and will not receive requests.
+- Useful for delaying traffic until the application is fully initialized.
+
+**Liveness Probe**
+
+- Indicates if a container is _alive_ (i.e., running as expected).
+- If the liveness probe fails, Kubernetes restarts the container.
+- Useful for recovering from deadlocks or stuck processes.
+
+**Probe Types**
+
+- `httpGet`: Performs an HTTP GET request.
+- `tcpSocket`: Checks if a TCP socket is open.
+- `exec`: Runs a command inside the container.
+
+**Example:**
+
+```yaml
+livenessProbe:
+  httpGet:
+    path: /healthz
+    port: 8080
+  initialDelaySeconds: 10
+  periodSeconds: 5
+
+readinessProbe:
+  httpGet:
+    path: /ready
+    port: 8080
+  initialDelaySeconds: 5
+  periodSeconds: 5
+```
+
+**End of Section 5: Observability**
+
+#### Section 6: Pod Design
+
+##### Deployment Strategies
+
+When deploying new versions of applications in Kubernetes, common deployment strategies are **Recreate**, **Rolling Update**, **Blue Green**, and **Canary**.
+
+**1. Recreate**
+
+- Terminates all existing pods before creating new ones.
+- Causes downtime during the deployment, as no pods are available while the new version starts.
+- Simple to implement but not suitable for high-availability applications.
+- Example: All old pods are stopped, then new pods are started with the updated version.
+- Pros: Ensures only one version is running at any time, avoids compatibility issues.
+- Cons: Downtime during the transition, not ideal for production workloads.
+
+**2. Rolling Update**
+
+- Gradually replaces old pods with new ones.
+- Ensures zero downtime by incrementally updating pods.
+- Kubernetes Deployments use rolling updates by default. Under the hood, a new replicaset is created for the rolling update.
+- Example: If you have 5 replicas, Kubernetes will terminate one old pod and start a new one, repeating until all pods are updated.
+- Pros: No downtime, easy rollback.
+- Cons: Briefly runs both old and new versions, which may cause issues if they are incompatible.
+
+**Important: Rollout**
+
+- Every time you update the Deployment spec (e.g., change the image, environment variables, etc.), Kubernetes creates a new _revision_.
+- The revision history is stored in the Deployment's ReplicaSets and can be viewed with the `rollout history` command.
+
+  ```sh
+  kubectl rollout status deployment/<deployment-name>
+  ```
+
+  Shows the progress of the current rollout.
+
+  ```sh
+  kubectl rollout history deployment/<deployment-name>
+  ```
+
+  Lists all revisions of the Deployment, showing changes over time.
+
+  ```sh
+  kubectl rollout undo deployment/<deployment-name> --to-revision=<revision-number>
+  ```
+
+  Rolls back to a specific revision from the history.
+
+  ```sh
+  kubectl set image deployment nginx nginx=nginx:1.17 --record
+  ```
+
+  We can use the --record flag to save the command used to create/update a deployment against the revision number (shown in the change-clause of `rollout history`)
+
+**3. Blue Green**
+
+- Maintains two separate environments: "blue" (current/production) and "green" (new version).
+- Deploys the new version to the green environment while blue continues serving traffic.
+- Once the green environment is verified, traffic is switched from blue to green (usually by updating a Service or Ingress).
+- Enables instant rollback by redirecting traffic back to blue if issues are found.
+- Pros: Zero downtime, easy rollback, safe testing of new versions.
+- Cons: Requires double the resources during deployment, more complex setup.
+
+**4. Canary**
+
+- Gradually rolls out the new version to a small subset of users or pods before a full rollout.
+- Initially, only a small percentage of traffic is routed to the new version (the "canary"), while the rest continues to use the old version.
+- If the canary performs well (no errors, good metrics), the rollout continues to more pods or users until the new version is fully deployed.
+- If issues are detected, the rollout can be halted or rolled back with minimal impact.
+- Pros: Reduces risk by exposing changes to a small group first, enables real-world testing, easy rollback.
+- Cons: Requires monitoring and automation to manage traffic shifting, more complex than rolling updates.
+
+**Example:** In Kubernetes, canary deployments can be implemented using multiple Deployments and Services, or with advanced tools like [Argo Rollouts](https://argoproj.github.io/argo-rollouts/), or [Flagger](https://flagger.app/) that automate traffic shifting and analysis.
+
+```yaml
+# Example: Two Deployments (stable and canary) with a Service
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: my-app-stable
+spec:
+  replicas: 4
+  template:
+    spec:
+      containers:
+        - name: my-app
+          image: my-app:v1
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: my-app-canary
+spec:
+  replicas: 1 # this will make the service route the least traffic here as it distributes the traffic equally among the replicas
+  template:
+    spec:
+      containers:
+        - name: my-app
+          image: my-app:v2
+```
+
+The Service routes traffic to both Deployments, allowing a small portion to hit the canary since it only has one pod.
+
+##### Jobs
+
+A **Job** in Kubernetes is a controller that ensures a specified number of pods successfully complete their work (run to completion). Unlike Deployments, which manage long-running applications, Jobs are used for batch or one-off tasks such as data processing, database migrations, or scheduled scripts.
+
+```yaml
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: pi
+spec:
+  template:
+    spec:
+      containers:
+        - name: pi
+          image: perl
+          command: ['perl', '-Mbignum=bpi', '-wle', 'print bpi(2000)']
+      restartPolicy: Never
+```
+
+- `restartPolicy: Never` is required for Jobs. By default for pods, `restartPolicy: Always` which makes Pods restart the container shortly after it exits. Hence, `restartPolicy: Never` is required for Jobs.
+
+You can run multiple pods in parallel by setting `parallelism` and `completions`:
+
+```yaml
+spec:
+  completions: 5
+  parallelism: 2
+```
+
+- `completions`: Total successful pods needed.
+- `parallelism`: How many pods run at the same time.
+
+##### CronJobs
+
+For recurring tasks, use a **CronJob**:
+
+```yaml
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: hello
+spec:
+  schedule: '*/5 * * * *'
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+            - name: hello
+              image: busybox
+              args:
+                - /bin/sh
+                - -c
+                - date; echo Hello from the Kubernetes cluster
+          restartPolicy: OnFailure
+```
+
+**Useful Commands:**
+
+- List jobs: `kubectl get jobs`
+- Describe a job: `kubectl describe job <job-name>`
+- View job pods: `kubectl get pods --selector=job-name=<job-name>`
+
+**End of Section 6: Pod Design!**
+
+#### Section 7: Services & Networking
+
+##### Services
+
+Kubernetes **Services** provide stable networking endpoints to access a set of pods from inside and outside the cluster. Since pods are ephemeral and can be recreated with different IPs, Services abstract away the underlying pod IPs and offer a consistent way to reach your application.
+
+**Why Use Services?**
+
+- Pods are created and destroyed dynamically; their IPs change.
+- Services provide a stable DNS name and IP address for clients to connect to.
+- They enable load balancing across multiple pod replicas.
+
+**Types of Services:**
+
+1. **ClusterIP** (default)
+
+- Exposes the Service on an internal IP in the cluster.
+- Accessible only within the cluster.
+- Use case: Provides an interface for internal communication between the different microservices.
+- Example:
+  ```yaml
+  apiVersion: v1
+  kind: Service
+  metadata:
+    name: my-service
+  spec:
+    selector:
+      app: my-app
+    ports:
+      - protocol: TCP
+        port: 80
+        targetPort: 8080
+  ```
+
+2. **NodePort**
+
+- Exposes the Service on a static port on each node's IP.
+- Accessible from outside the cluster using `<NodeIP>:<NodePort>`.
+- If you have an app spanning multiple nodes, NodePort allows you to access any pod replica via any node's IP and the assigned port without extra configuration.
+- Use case: Simple external access for development/testing.
+- Example:
+  ```yaml
+  spec:
+    type: NodePort
+    ports:
+      - port: 80 # required
+        targetPort: 8080 # optional, defaults to port
+        nodePort: 30080 # optional, defaults to any valid port available between 30000 and 32767
+  ```
+
+3. **LoadBalancer**
+
+- Provisions an external load balancer (cloud provider required).
+- Exposes the Service externally using a cloud provider's load balancer.
+- Use case: Production-grade external access.
+- Example:
+  ```yaml
+  spec:
+    type: LoadBalancer
+    ports:
+      - port: 80
+        targetPort: 8080
+  ```
+
+4. **ExternalName**
+
+- Maps the Service to a DNS name (external to the cluster).
+- No proxying; just DNS CNAME.
+- Example:
+  ```yaml
+  spec:
+    type: ExternalName
+    externalName: my.database.example.com
+  ```
+
+**How Services Work:**
+
+- Services use **selectors** to match pods via labels.
+- Traffic sent to the Service is load balanced across matching pods.
+- Kubernetes sets up virtual IPs (ClusterIP) and manages routing via kube-proxy.
+
+**Useful Commands:**
+
+- List services: `kubectl get svc`
+- Describe a service: `kubectl describe svc <service-name>`
+- Get endpoints: `kubectl get endpoints <service-name>`
+
+**Headless Services:**
+
+- Set `clusterIP: None` to create a headless Service.
+- No load balancing or cluster IP; DNS returns pod IPs directly.
+- Useful for StatefulSets and direct pod-to-pod communication.
+
+##### Ingress
+
+**Ingress** is a Kubernetes API object that manages external HTTP and HTTPS access to services within a cluster. It provides a way to define routing rules for incoming traffic, enabling you to expose multiple services under a single IP address or DNS name and route requests based on hostnames or URL paths.
+
+**Why Use Ingress?**
+
+- Consolidates access to multiple services behind a single entry point.
+- Supports advanced routing (e.g., path-based, host-based).
+- Enables TLS/SSL termination at the edge.
+- Reduces the need for multiple LoadBalancer or NodePort services.
+
+**How Ingress Works:**
+
+- **Ingress Resource:** Defines routing rules (e.g., `/api` goes to Service A, `/web` to Service B).
+- **Ingress Controller:** A pod running in the cluster (e.g., NGINX, Traefik) that implements the rules and manages the actual traffic routing. You must provision this as Kubernetes does not provide one by default.
+
+**Typical Flow:**
+
+```
+Client → LoadBalancer/NodePort → Ingress Controller → Service → Pod
+```
+
+**Example: Deploying an Ingress Controller (NGINX)**
+
+To use Ingress resources, you need to deploy an Ingress controller. Below is a minimal example of deploying the NGINX Ingress Controller using a Deployment and a ConfigMap.
+
+**nginx-ingress-controller Deployment:**
+
+This is a simple example nginx-ingress-controller deployment for demo purposes. Other services such as LoadBalancer/NodePort, ConfigMap, and ServiceAccount are required.
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ingress-nginx-controller
+  namespace: ingress-nginx
+  labels:
+    app.kubernetes.io/name: ingress-nginx
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: ingress-nginx
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: ingress-nginx
+    spec:
+      serviceAccountName: ingress-nginx
+      containers:
+      - name: controller
+        image: registry.k8s.io/ingress-nginx/controller:v1.9.4
+        args:
+          - /nginx-ingress-controller
+          - --configmap=$(POD_NAMESPACE)/ingress-nginx-controller
+        env:
+        - name: POD_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.name
+          - name: POD_NAMESPACE
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.namespace
+        ports:
+          - name: http
+            containerPort: 80
+          - name: https
+            containerPort: 443
+```
+
+Once the controller is running, your Ingress resources will be processed and traffic will be routed according to your rules.
+
+**Example Ingress Resource:**
+
+```yaml
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+  name: example-ingress
+spec:
+  rules:
+    - host: myapp.example.com
+      http:
+        paths:
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: api-service
+                port:
+                  number: 80
+          - path: /web
+            pathType: Prefix
+            backend:
+              service:
+                name: web-service
+                port:
+                  number: 80
+  tls:
+    - hosts:
+        - myapp.example.com
+      secretName: my-tls-secret
+```
+
+**Key Points:**
+
+- **Ingress Controller Required:** You must deploy an Ingress controller (e.g., ingress-nginx) for Ingress resources to take effect.
+- **TLS Support:** Ingress can terminate SSL/TLS using Kubernetes secrets.
+- **Annotations:** Ingress resources can use annotations for custom behaviors (e.g., rewrite-target, rate limiting). The rewrite-target annotation, for instance, is used to modify the URL path of incoming requests before they are sent to the backend service.
+
+**Useful Commands:**
+
+- List ingresses: `kubectl get ingress`
+- Describe ingress: `kubectl describe ingress <name>`
+
+##### Network Policies
+
+**Network Policies** in Kubernetes are resources that control the network traffic flow between pods and/or namespaces. They allow you to specify which pods can communicate with each other and with external endpoints, providing fine-grained control over network access within your cluster.
+
+**Why Use Network Policies?**
+
+- By default, all pods can communicate with each other (allow all).
+- Network Policies let you restrict traffic for security and compliance.
+- You can enforce isolation between environments, applications, or tenants.
+
+**How Network Policies Work:**
+
+- Network Policies are implemented by the network plugin (CNI) used in your cluster (e.g., Calico, Cilium, Weave). Not all CNIs support them.
+- Policies are applied to pods selected by labels.
+- You can define rules for ingress (incoming) and egress (outgoing) traffic.
+
+**Basic Example: Allow Only Frontend to Access Backend**
+
+```yaml
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-frontend-to-backend
+  namespace: my-app
+spec:
+  podSelector:
+    matchLabels:
+      app: backend
+  policyTypes:
+    - Ingress # Since only Ingress is specified, Egress default values persist.
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: frontend
+```
+
+- This policy allows only pods with label `app: frontend` to connect to pods with label `app: backend` in the `my-app` namespace.
+- All other incoming traffic to backend pods is denied.
+
+**Key Points:**
+
+- If any NetworkPolicy selects a pod, all traffic not explicitly allowed is denied (default deny).
+- You can combine multiple policies for complex scenarios.
+- Policies can match on pod labels, namespace labels, and IP blocks.
+
+**Useful Commands:**
+
+- List network policies: `kubectl get networkpolicy`
+- Describe a policy: `kubectl describe networkpolicy <name>`
+
+**End of Section 7: Services & Networking!**
+
+#### Section 8: State Persistence
+
+##### Volumes
+
+**Volumes** in Kubernetes provide a way for containers in a pod to store and share data. Unlike a container's local filesystem, which is ephemeral and lost when the container restarts, volumes persist data for the lifetime of the pod. Volumes can be used for sharing files between containers in a pod or for persisting data across container restarts (but not pod restarts).
+
+**Types of Volumes:**
+
+- `emptyDir`: Created when a pod is assigned to a node, exists as long as the pod runs.
+- `hostPath`: Mounts a file or directory from the host node's filesystem.
+- `configMap`, `secret`, `downwardAPI`: Used for injecting config data or secrets.
+- Many others for cloud storage, NFS, etc.
+
+##### Persistent Volumes and PersistentVolumeClaims
+
+Kubernetes separates storage provisioning from usage using the Persistent Volume (PV) and PersistentVolumeClaim (PVC) model. Suppose you have a pod that needs to store user uploads. With a normal volume like `emptyDir`, data is lost if the pod restarts or moves to another node. Using a `hostPath` volume can persist data across container restarts and even pod restarts, but only as long as the pod is scheduled on the same node—if the pod moves to a different node, the data is lost.
+
+With PV/PVC, storage is managed at the cluster level and is decoupled from individual pods and nodes. This means:
+
+- Data persists even if the pod is deleted and recreated, or scheduled on a different node (as long as the underlying storage supports it).
+- Storage can be dynamically provisioned and managed independently of workloads.
+- Access modes and storage classes allow for flexible, cloud-native storage solutions.
+
+**Example:**  
+If you use a PVC backed by a networked storage system (like NFS or cloud block storage), your pod can be rescheduled anywhere in the cluster and still access the same persistent data, which is not possible with `hostPath` or `emptyDir`.
+
+- **PersistentVolume (PV):**  
+  A cluster-wide resource representing a piece of storage in the cluster, provisioned by an admin or dynamically via a StorageClass. PVs have a lifecycle independent of any individual pod.
+
+  ```yaml
+  apiVersion: v1
+  kind: PersistentVolume
+  metadata:
+    name: my-pv
+  spec:
+    capacity:
+      storage: 5Gi
+    accessModes:
+      - ReadWriteOnce
+    hostPath:
+      path: /mnt/data
+  ```
+
+- **PersistentVolumeClaim (PVC):**  
+  A request for storage by a user. Pods use PVCs to claim storage resources. The PVC specifies size, access mode, and optionally a StorageClass.
+
+  ```yaml
+  apiVersion: v1
+  kind: PersistentVolumeClaim
+  metadata:
+    name: my-pvc
+  spec:
+    accessModes:
+      - ReadWriteOnce
+    resources:
+      requests:
+        storage: 2Gi
+  ```
+
+- **How it works:**
+
+  1. Admin (or dynamic provisioner) creates a PV.
+  2. User creates a PVC.
+  3. Kubernetes binds the PVC to a suitable PV.
+  4. The PVC can be mounted as a volume in a pod.
+
+  ```yaml
+  apiVersion: v1
+  kind: Pod
+  metadata:
+    name: my-pod
+  spec:
+    containers:
+      - name: app
+        image: busybox
+        volumeMounts:
+          - mountPath: '/data'
+            name: my-storage
+    volumes:
+      - name: my-storage
+        persistentVolumeClaim:
+          claimName: my-pvc
+  ```
+
+**Key Points:**
+
+- PVs are provisioned storage; PVCs are requests for storage.
+- PVCs decouple storage usage from storage provisioning.
+- 1 to 1 relationship between PVs and PVCs. Its advisable to use labels and selectors to pair them up.
+- Supports dynamic provisioning via StorageClasses.
+- Access modes: `ReadWriteOnce`, `ReadOnlyMany`, `ReadWriteMany`.
+- Useful commands:
+  - `kubectl get pv`
+  - `kubectl get pvc`
+  - `kubectl describe pvc <name>`
+
+##### Storage Classes
+
+**Storage Classes** in Kubernetes provide a way to describe different types of storage (e.g., SSD, HDD, network-attached, cloud block storage) and their provisioning parameters. They enable dynamic provisioning of PersistentVolumes (PVs) so that users don't need to manually create PVs ahead of time.
+
+**Why Use Storage Classes?**
+
+- Automate PV creation when a PersistentVolumeClaim (PVC) requests storage.
+- Allow different storage backends and performance profiles (e.g., fast SSD vs. standard HDD).
+- Enable features like encryption, replication, or custom mount options.
+
+**How Storage Classes Work:**
+
+- A cluster admin defines one or more StorageClass resources, each specifying a provisioner (plugin) and parameters.
+- When a PVC specifies a `storageClassName`, Kubernetes uses the corresponding StorageClass to dynamically provision a PV that matches the claim.
+- If no `storageClassName` is specified, the default StorageClass (if set) is used.
+
+**Example StorageClass:**
+
+```yaml
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: fast-ssd
+provisioner: kubernetes.io/aws-ebs
+volumeBindingMode: waitForFirstConsumer
+parameters:
+  type: gp3
+  encrypted: 'true'
+reclaimPolicy: Delete
+mountOptions:
+  - discard
+```
+
+**Example PVC using a StorageClass:**
+
+```yaml
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: my-fast-pvc
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+  storageClassName: fast-ssd
+```
+
+**Key Points:**
+
+- The `provisioner` field specifies the storage backend (e.g., AWS EBS, GCE PD, NFS, CSI drivers).
+- `parameters` are backend-specific options (e.g., disk type, IOPS).
+- `reclaimPolicy` controls what happens to the PV after the PVC is deleted (`Delete` or `Retain`).
+- You can set a default StorageClass by adding the annotation `storageclass.kubernetes.io/is-default-class: "true"`.
+
+**Useful Commands:**
+
+- List storage classes: `kubectl get storageclass`
+- Describe a storage class: `kubectl describe storageclass <name>`
+
+##### StatefulSets
+
+**StatefulSets** are a Kubernetes resource designed for managing stateful applications that require stable network identities, persistent storage, and ordered deployment or scaling. Unlike Deployments, which are ideal for stateless workloads, StatefulSets provide guarantees for the identity and storage of each pod.
+
+**Key Features:**
+
+- **Stable, unique network identities:** Each pod in a StatefulSet gets a persistent DNS name based on its ordinal index (e.g., `myapp-0`, `myapp-1`).
+- **Stable storage:** Each pod can have its own PersistentVolumeClaim, ensuring data persists across pod restarts and rescheduling.
+- **Ordered, graceful deployment and scaling:** Pods are created, updated, and deleted in a defined order (from lowest to highest ordinal).
+- **Ordered rolling updates and rollbacks:** Ensures updates happen one pod at a time, maintaining application stability.
+
+**Typical Use Cases:**
+
+- Databases (e.g., MySQL, PostgreSQL, MongoDB) (important for database replication)
+- Distributed systems (e.g., Kafka, Zookeeper, Elasticsearch)
+- Any workload needing stable identities and persistent storage
+
+**Example:**
+
+```yaml
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: web
+spec:
+  serviceName: 'web'
+  replicas: 3
+  selector:
+    matchLabels:
+      app: nginx
+  template:
+    metadata:
+      labels:
+        app: nginx
+    spec:
+      containers:
+        - name: nginx
+          image: nginx:1.21
+          volumeMounts:
+            - name: www
+              mountPath: /usr/share/nginx/html
+  volumeClaimTemplates:
+    - metadata:
+        name: www
+      spec:
+        accessModes: ['ReadWriteOnce']
+        resources:
+          requests:
+            storage: 1Gi
+```
+
+- Each pod (`web-0`, `web-1`, `web-2`) gets its own PVC named `www-web-0`, `www-web-1`, etc.
+- Pods are created and terminated in order, ensuring predictable startup/shutdown.
+
+**Important Notes:**
+
+- StatefulSets require a headless Service (`clusterIP: None`) for stable network identities.
+- PVCs created by StatefulSets are not deleted automatically when the StatefulSet is deleted; you must clean them up manually if desired.
+- Not all applications need StatefulSets—use them only when you need stable identity or storage.
+
+**Useful Commands:**
+
+- List StatefulSets: `kubectl get statefulsets`
+- Describe a StatefulSet: `kubectl describe statefulset <name>`
+- View pods: `kubectl get pods -l app=nginx`
+
+##### Storage in StatefulSets
+
+When using StatefulSets, each pod gets its own PersistentVolumeClaim (PVC) from the `volumeClaimTemplates` section. This ensures that each replica has dedicated storage that persists across pod restarts and rescheduling. The PVCs are named using the pattern `<claim-name>-<statefulset-name>-<ordinal>`, e.g., `www-web-0`, `www-web-1`, etc.
+
+**How it works:**
+
+- When a StatefulSet is created, Kubernetes automatically creates a PVC for each replica based on the `volumeClaimTemplates`.
+- Each pod mounts its own PVC at the specified mount path.
+- If a pod is deleted and recreated (even on a different node), it will reattach to its own PVC, preserving its data.
+- PVCs created by StatefulSets are not deleted when the StatefulSet or pods are deleted; you must manually delete them if you want to reclaim the storage.
+
+**Example:**
+
+```yaml
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: db
+spec:
+  serviceName: 'db'
+  replicas: 2
+  selector:
+    matchLabels:
+      app: postgres
+  template:
+    metadata:
+      labels:
+        app: postgres
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:15
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ['ReadWriteOnce']
+        resources:
+          requests:
+            storage: 10Gi
+```
+
+This creates two PVCs: `data-db-0` and `data-db-1`, each mounted to its respective pod.
+
+##### Headless Services
+
+A **headless Service** in Kubernetes is a Service without a cluster IP (`clusterIP: None`). Unlike a standard Service, which provides a single stable virtual IP and load-balances traffic to backend pods, a headless Service allows clients to discover the individual pod IPs directly via DNS.
+
+The headless ClusterIP service is needed to address each pod in a StatefulSet individually (DNS resolution) as the normal ClusterIP service provides a single stable IP address and DNS name for accessing the StatefulSet pods as a whole and not individually.
+
+**Key Points:**
+
+- Each pod gets a stable DNS name (e.g., `pod-0.my-headless-service.default.svc.cluster.local`).
+- A `hostname` and a `subdomain` required for a regular Pod using headless service. A StatefulSet automatically assigns those fields but you must set the `serviceName` in the StatefulSet definition file.
+- No load balancing or proxying is performed by Kubernetes.
+- DNS returns A records for each pod IP.
+- Essential for StatefulSets and some distributed systems.
+
+**Useful Commands:**
+
+- View endpoints: `kubectl get endpoints <service-name>`
+- Describe service: `kubectl describe svc <service-name>`
+
+**End of Section 8: State Persistence!**
