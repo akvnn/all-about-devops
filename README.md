@@ -1880,3 +1880,678 @@ The headless ClusterIP service is needed to address each pod in a StatefulSet in
 - Describe service: `kubectl describe svc <service-name>`
 
 **End of Section 8: State Persistence!**
+
+#### Section 9: Security
+
+##### Authentication
+
+Authentication: who can access the cluster (kube-apiserver).
+Kubernetes supports multiple authentication mechanisms to control access to the API server. Common methods include:
+
+- **Static Token File:** Pre-generated bearer tokens mapped to users/groups. Useful for simple or test clusters.
+- **X.509 Client Certificates:** Used for authenticating users and components (e.g., kubelets, controllers). Certificates are signed by the cluster's Certificate Authority (CA).
+- **Bootstrap Tokens:** Short-lived tokens for bootstrapping nodes.
+- **Service Account Tokens:** Automatically mounted into pods for in-cluster authentication. Used by applications and controllers.
+- **OpenID Connect (OIDC):** Integrates with external identity providers (e.g., Google, Azure AD, Okta) for single sign-on and centralized user management.
+- **Webhook Token Authentication:** Delegates authentication to an external service via webhook.
+
+Authentication is the first step; after successful authentication, authorization and admission control determine what actions the user or service account can perform.
+
+##### KubeConfig
+
+A **kubeconfig** file is a YAML configuration file used by `kubectl` and other Kubernetes clients to authenticate and interact with one or more clusters. It contains information about clusters, users, contexts, and credentials.
+
+**Key Sections:**
+
+- `clusters`: Defines cluster endpoints and certificate authorities.
+- `users`: Stores authentication info (certificates, tokens, etc.).
+- `contexts`: Associates a user with a cluster and namespace.
+- `current-context`: Specifies the default context for commands.
+
+**Default Location:**  
+`~/.kube/config` (can be overridden with `--kubeconfig` flag).
+
+**Example:**
+
+```yaml
+apiVersion: v1
+kind: Config
+clusters:
+  - name: my-cluster
+    cluster:
+      server: https://1.2.3.4:6443
+      certificate-authority: /path/to/ca.crt
+users:
+  - name: my-user
+    user:
+      client-certificate: /path/to/client.crt
+      client-key: /path/to/client.key
+contexts:
+  - name: my-context
+    context:
+      cluster: my-cluster
+      user: my-user
+      namespace: default
+current-context: my-context
+```
+
+**Common Commands:**
+
+- View config: `kubectl config view`
+- Switch context: `kubectl config use-context <context-name>`
+- List contexts: `kubectl config get-contexts`
+- Set namespace: `kubectl config set-context --current --namespace=<ns>`
+
+**Tip:**  
+You can merge multiple kubeconfig files by setting the `KUBECONFIG` environment variable with a colon-separated list of files.
+
+##### API Groups
+
+Kubernetes organizes its API resources into logical groupings called **API groups**. Each group represents a set of related functionality and resources, allowing the Kubernetes API to evolve and add new features without breaking existing clients.
+
+**Core (Legacy) Group:**
+
+- Resources like `Pod`, `Service`, `Node`, and `Namespace` are part of the core group.
+- These resources use URLs like `/api/v1`.
+
+**Named API Groups:**
+
+- Additional features and resources are organized into named groups, such as:
+  - `apps` (e.g., Deployments, StatefulSets, DaemonSets)
+  - `batch` (e.g., Jobs, CronJobs)
+  - `rbac.authorization.k8s.io` (e.g., Roles, RoleBindings)
+  - `networking.k8s.io` (e.g., Ingress, NetworkPolicy)
+- These resources use URLs like `/apis/<group>/<version>` (e.g., `/apis/apps/v1`).
+
+**Why API Groups Matter:**
+
+- Enable versioning and evolution of APIs.
+- Allow independent development and deprecation of features.
+- Help organize resources logically.
+
+**How to Identify API Groups:**
+
+- The `apiVersion` field in a manifest specifies the group and version, e.g.:
+  - `apiVersion: v1` (core group)
+  - `apiVersion: apps/v1` (apps group)
+  - `apiVersion: batch/v1` (batch group)
+
+**List All API Groups:**
+
+```sh
+kubectl api-versions
+```
+
+**Side note: kube-proxy vs kubectl-proxy:**
+
+**kube-proxy** is a network component that runs on each node in a Kubernetes cluster. It maintains network rules on nodes, enabling communication to and from pods, and implements Service load balancing by managing iptables, IPVS, or userspace proxying.
+
+**kubectl proxy** is a command-line tool that runs a local HTTP proxy (port 8001) to the Kubernetes API server. It allows you to access the Kubernetes API securely from your local machine or a pod, forwarding requests to the API server using your kubeconfig credentials.
+
+
+##### Authroization
+
+Authorization: what can a user do after they have been authenticated. Kubernetes supports multiple authorization modules, with the most common being **Role-Based Access Control (RBAC)**.
+
+###### RBAC (Role-Based Access Control)
+
+RBAC allows you to define roles with specific permissions and bind them to users or service accounts.
+
+- **Role**: Defines permissions (verbs like get, list, create, delete) within a namespace.
+- **ClusterRole**: Like Role, but applies cluster-wide or to non-namespaced resources.
+- **RoleBinding**: Grants a Role's permissions to a user or service account within a namespace.
+- **ClusterRoleBinding**: Grants a ClusterRole's permissions cluster-wide.
+
+**Example: Granting read-only access to pods in dev namespace**
+
+```yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  namespace: dev
+  name: pod-reader
+rules:
+- apiGroups: [""]
+  resources: ["pods"]
+  verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: read-pods
+  namespace: dev
+subjects:
+- kind: User
+  name: jane
+roleRef:
+  kind: Role
+  name: pod-reader
+  apiGroup: rbac.authorization.k8s.io
+```
+
+**Some Other Authorization Modes**
+
+- **Node Authorization**: Grants kubelets permissions to perform actions on their own resources.
+- **ABAC (Attribute-Based Access Control)**: Uses policies defined in a file (less common).
+- **Webhook Authorization**: Delegates authorization decisions to an external service.
+
+**Key Commands**
+
+- List roles: `kubectl get roles --all-namespaces`
+- List role bindings: `kubectl get rolebindings --all-namespaces`
+- Check access: `kubectl auth can-i <verb> <resource> --as <user>`
+
+###### Namspaced vs Cluster-Scoped Resources
+
+In Kubernetes, resources are either **namespaced** or **cluster-scoped**:
+
+- **Namespaced resources** exist within a specific namespace and are isolated from resources in other namespaces. Examples include Pods, Services, Deployments, ConfigMaps, Secrets, Roles, and RoleBindings. Namespaces are useful for organizing resources by environment, team, or application.
+
+- **Cluster-scoped resources** exist at the cluster level and are not tied to any namespace. They apply to the entire cluster. Examples include Nodes, PersistentVolumes, Namespaces themselves, ClusterRoles, and ClusterRoleBindings.
+
+**Key Differences:**
+
+- Namespaced resources require a namespace for creation and access; cluster-scoped resources do not.
+- RBAC permissions for namespaced resources use Roles and RoleBindings; cluster-scoped resources use ClusterRoles and ClusterRoleBindings.
+- To list namespaced API resourced:
+  `kubectl api-resources --namespaced=true`
+- Side note: PVC is namespaced while PV is cluster-scoped
+- To list namespaced resources:  
+  `kubectl get <resource> -n <namespace>`
+- To list cluster-scoped resources:  
+  `kubectl get <resource>`
+##### Admission Controllers
+
+**Admission Controllers** are plugins that intercept requests to the Kubernetes API server after authentication and authorization, but before the object is persisted. They can modify (mutate) or reject (validate) requests, enforcing policies or injecting defaults.
+
+Kubernetes enables several admission controllers by default to provide baseline security, resource management, and policy enforcement. 
+
+**Types of Admission Controllers:**
+- **Validating Admission Controllers:** Inspect requests and can reject them if they don't meet certain criteria (e.g., PodSecurity, ResourceQuota).
+- **Mutating Admission Controllers:** Can modify requests before they are persisted (e.g., adding default labels, injecting sidecars).
+
+**Common Use Cases:**
+- Enforcing security policies (e.g., PodSecurityPolicy, PodSecurity admission).
+- Injecting sidecar containers (e.g., Istio, Linkerd).
+- Setting resource defaults or limits.
+- Restricting image registries or namespaces.
+
+**How They Work:**
+1. User submits a request to the API server.
+2. Authentication and authorization are performed.
+3. Admission controllers are invoked in sequence:
+  - Mutating controllers run first and can modify the object.
+  - Validating controllers run next and can accept or reject the object.
+4. If all controllers approve, the object is persisted.
+
+- **Webhook Admission Controllers:** Allow custom logic via HTTP callbacks (MutatingAdmissionWebhook, ValidatingAdmissionWebhook). Useful for custom policies or integrations.
+
+**Configuration:**
+- Admission controllers are enabled/disabled via the API server's `--enable-admission-plugins` flag.
+- Webhooks are configured using `MutatingWebhookConfiguration` and `ValidatingWebhookConfiguration` resources.
+
+**Example Validating Webhook Configuration Manifest:**
+
+```yaml
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingWebhookConfiguration
+metadata:
+  name: example-validating-webhook
+webhooks:
+  - name: validate.example.com
+    clientConfig:
+      service:
+        name: example-webhook-service
+        namespace: default
+        path: /validate
+      caBundle: <base64-encoded-CA-cert>
+    rules:
+      - apiGroups: ["apps"]
+        apiVersions: ["v1"]
+        operations: ["CREATE", "UPDATE"]
+        resources: ["deployments"]
+        scope: "Namespaced"
+    admissionReviewVersions: ["v1"]
+    sideEffects: None
+    timeoutSeconds: 10
+```
+
+**Key Points:**
+- Admission controllers are critical for enforcing cluster-wide policies and automating best practices.
+- They operate at the API level, affecting all resource creation and modification requests.
+
+**Useful Commands:**
+- List enabled admission plugins:  
+  `kube-apiserver -h  | grep enable-admission-plugins`
+- You can also look at the kube-apiserver process:  
+  `ps -ef | grep kube-apiserver | grep admission-plugins`
+- View webhook configurations:  
+  `kubectl get mutatingwebhookconfigurations`
+  `kubectl get validatingwebhookconfigurations`
+
+##### API Versions
+
+Kubernetes resources are defined and managed via the Kubernetes API, which evolves over time. Each resource kind is associated with an `apiVersion` that determines the schema and features available for that resource.
+
+**API Version Format:**
+```
+<group>/<version>
+```
+- **Core group** resources (like Pod, Service) use `apiVersion: v1`.
+- Other resources use a group and version, e.g., `apps/v1`, `batch/v1`, `rbac.authorization.k8s.io/v1`.
+
+**API Version Stages:**
+- **alpha**: Early preview, may change or be removed at any time. Not enabled by default.
+- **beta**: More stable, enabled by default, but may still change.
+- **stable (no prefix)**: Considered production-ready (e.g., `v1`).
+
+**Preferred and Storage Versions:**
+
+  The preferred version is the API version that Kubernetes recommends for interacting with a resource via `kubectl` or client libraries. When you run `kubectl get <resource>`, Kubernetes uses the preferred version for that resource group.
+
+  The storage version is the API version that Kubernetes uses to persist the resource in etcd (the cluster's backing store). Even if you create or update a resource using a different version, Kubernetes converts it to the storage version before saving it.
+
+**Why API Versions Matter:**
+- The API version controls which fields are available and how resources behave.
+- Deprecated versions are eventually removed; manifests must be updated to use supported versions.
+- Upgrading Kubernetes may require updating manifests to newer API versions.
+
+**Examples:**
+```yaml
+apiVersion: v1
+kind: Pod
+# Core group, stable
+
+apiVersion: apps/v1
+kind: Deployment
+# apps group, stable
+
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+# networking group, stable
+```
+
+**Checking Supported API Versions:**
+- List all supported resources and their API versions:
+  ```
+  kubectl api-resources
+  ```
+- List all available API versions:
+  ```
+  kubectl api-versions
+  ```
+
+**Useful Tools:**
+- [`kubent`](https://github.com/doitintl/kube-no-trouble): Detects deprecated APIs in your cluster.
+- `kubectl explain <resource>`: Shows documentation for a resource, including supported fields for its API version.
+
+##### API Deprecation
+
+Kubernetes evolves rapidly, and as new features and improvements are introduced, older API versions may be deprecated and eventually removed. Understanding the deprecation policy is crucial for maintaining cluster compatibility and ensuring smooth upgrades.
+
+API deprecation means that a particular API version is marked for removal in a future Kubernetes release. Deprecated APIs continue to function for a period of time, but users are encouraged to migrate to the newer, supported versions.
+
+**API Deprecation Policy Rules:**
+
+1. API elements may only be removed by incrementing the version of the API group (e.g., v1alpha1 to v1alpha2).
+2. API objects must be able to round-trip between API versions in a given release without information loss, with the excpetion of whole REST resources that do not exist in some versions (e.g., v1alpha1 to v1alpha2 back to v1alpha1).
+3. An API version in a given track may not be deprecated until a new API version at least as stable is released (e.g., GA can deprecate a beta version, but not the other way around).
+4. a. Other then the most recent API versions in each track, older API versions must be supported after their announced deprecation for a duration of no less than: 
+  - GA: 12 months or 3 releases (whichever is longer)
+  - Beta: 9 months or 3 releases (whichever is longer)
+  - Alpha: 0 releases
+
+  b. The "preferred" API version and the "storage" version for a given group may not advance until after a release has been made that supports both the new version and the previous version (e.g., the second release after v1beta2 is introduced in addition to v1beta1)
+
+**Deprecation Policy Highlights:**
+
+- **Announcement:** Deprecations are announced in Kubernetes release notes and documentation.
+- **Grace Period:** Deprecated APIs are typically supported for at least one full release (often longer), giving users time to migrate.
+- **Removal:** After the deprecation period, the API version is removed in a subsequent release. Resources using the removed version will fail to work after upgrading.
+- **Backward Compatibility:** Kubernetes aims to maintain backward compatibility within a major version, but deprecated APIs may be removed in minor releases (e.g., v1.22 to v1.23).
+
+**Example:**
+
+The `extensions/v1beta1` API for Deployments, Ingress, and DaemonSets was deprecated in Kubernetes 1.16 and removed in 1.22. Users needed to migrate to `apps/v1` for Deployments and DaemonSets, and `networking.k8s.io/v1` for Ingress.
+
+**Converting to a new version:**
+
+`kubectl convert` is a command-line tool that helps you migrate Kubernetes manifests from deprecated or old API versions to newer, supported versions. This is especially useful when upgrading clusters or updating manifests to comply with the latest Kubernetes API standards.
+
+**Usage Examples:**
+
+Convert a manifest file from an old API version to the latest supported version:
+```sh
+kubectl convert -f old-deployment.yaml --output-version new-api -o yaml > new-deployment.yaml
+```
+
+Convert a live resource in the cluster:
+```sh
+kubectl convert -f <(kubectl get deployment my-deployment -o yaml) -o yaml
+```
+
+**Note:**  
+`kubectl convert` is not included in the default kubectl binary. You must [install](https://kubernetes.io/docs/tasks/tools/install-kubectl-linux/#install-kubectl-convert-plugin) it separately.
+
+##### Custom Resource Definitions (CRDs)
+
+**Custom Resource Definitions (CRDs)** allow you to extend the Kubernetes API by defining your own resource types. This enables you to manage custom objects (like `Foo`, `Bar`, etc.) just like built-in resources (Pods, Deployments).
+
+**Why Use CRDs?**
+- Add new API objects tailored to your application's needs.
+- Build controllers/operators that automate tasks for custom resources.
+- Integrate external systems or workflows with Kubernetes-native management.
+
+**How CRDs Work:**
+- You create a CRD manifest specifying the resource's schema, group, version, and scope (namespaced or cluster-scoped).
+- Once applied, Kubernetes exposes new endpoints (e.g., `/apis/mygroup/v1/foos`).
+- You can create, update, and delete custom resources using `kubectl` and the Kubernetes API.
+
+**Example CRD Manifest:**
+```yaml
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: widgets.example.com
+spec:
+  group: example.com
+  versions:
+    - name: v1
+      served: true
+      storage: true
+      schema:
+        openAPIV3Schema:
+          type: object
+          properties:
+            spec:
+              type: object
+              properties:
+                size:
+                  type: string
+  scope: Namespaced
+  names:
+    plural: widgets
+    singular: widget
+    kind: Widget
+    shortNames:
+      - wd
+```
+
+**Creating a Custom Resource:**
+```yaml
+apiVersion: example.com/v1
+kind: Widget
+metadata:
+  name: my-widget
+spec:
+  size: large
+```
+
+**Operators and Controllers:**
+- For each built-in resource, there is a dedicated controller (e.g., deployment controller) that runs in the background as a process and monitors the resource and performs the needed changes to maintain the state as expected (e.g., create replicaset for a deployment controller). They are all managed by the kube-controller-manager.
+
+- Operators are custom controllers that watch for changes to CRDs and automate actions (e.g., provisioning databases, managing certificates). Operator frameworks allows packaging of the custom controller with the CRD manifest. Popular operator frameworks: [Kubebuilder](https://book.kubebuilder.io/), [Operator SDK](https://sdk.operatorframework.io/).
+
+**Useful Commands:**
+- List CRDs: `kubectl get crds`
+- View custom resources: `kubectl get <custom-resource>`
+- Describe CRD: `kubectl describe crd <name>`
+
+**Done with Section 9: Security!**
+
+#### Section 10: Helm Fundamentals
+
+**Helm** is a package manager and templating engine for Kubernetes that simplifies the deployment and management of applications using reusable templates called charts. Helm charts package Kubernetes resources and configuration into a single unit, making it easy to install, upgrade, and share applications.
+
+**Key Concepts:**
+- **Chart:** A collection of files that describe a related set of Kubernetes resources.
+- **Release:** An instance of a chart running in a Kubernetes cluster.
+- **Repository:** A collection of charts available for download and installation.
+
+**Common Helm Commands:**
+- Add a chart repository (artifact hub is added by default):
+  ```
+  helm repo add <repo-name> <repo-url>
+  ```
+- Update chart repositories:
+  ```
+  helm repo update
+  ```
+- Search for charts:
+  ```
+  helm search repo <keyword>
+  ```
+- Install a chart:
+  ```
+  helm install <release-name> <chart> [--values values.yaml]
+  ```
+- List installed releases:
+  ```
+  helm list
+  ```
+- Upgrade a release:
+  ```
+  helm upgrade <release-name> <chart> [--values values.yaml]
+  ```
+- Uninstall a release:
+  ```
+  helm uninstall <release-name>
+  ```
+- View release history:
+  ```
+  helm history <release-name>
+  ```
+- Roll back to a previous release revision:
+  ```
+  helm rollback <release-name> <revision>
+  ```
+- Show chart values:
+  ```
+  helm show values <chart>
+  ```
+
+**Example Directory Structure:**
+  ```
+  k8s/helm-chart/
+    Chart.yaml           # Chart metadata (name, version, description)
+    values.yaml          # Default configuration values
+    values/              # Environment-specific values
+      stg.yaml           # Staging values
+      prod.yaml          # Production values
+    templates/           # Kubernetes manifest templates (YAML files)
+  ```
+**Done with Section 10: Helm Fundamentals!**
+
+#### Section 11: Kustomize Basics
+
+**Kustomize** is a tool built into `kubectl` for customizing Kubernetes resource configurations without modifying the original YAML files. It enables you to manage overlays, patches, and environment-specific settings in a declarative way.
+
+**Key Concepts:**
+- **Base:** A directory containing original resource manifests.
+- **Overlay:** A directory that modifies the base using patches, configMap generators, secret generators, etc.
+- **kustomization.yaml:** The main configuration file that defines resources, patches, and customizations.
+
+**Features:**
+- Patch existing manifests (add labels, change images, etc.).
+- Generate ConfigMaps and Secrets from files or literals.
+- Compose multiple bases and overlays for different environments (dev, staging, prod).
+- No need for templating languages; works directly with YAML.
+
+**Example Directory Structure:**
+```
+k8s/
+  base/
+    deployment.yaml
+    service.yaml
+    kustomization.yaml
+  overlays/
+    dev/
+      kustomization.yaml
+      patch.yaml
+    prod/
+      kustomization.yaml
+      patch.yaml
+```
+
+**Sample `kustomization.yaml`:**
+```yaml
+resources:
+  - deployment.yaml
+  - service.yaml
+
+patchesStrategicMerge:
+  - patch.yaml
+
+configMapGenerator:
+  - name: app-config
+    files:
+      - config.properties
+```
+
+**Common Commands:**
+- Get kustomization manifest output (usually for testing):
+  ```
+  kustomize build <directory>
+  ```
+- Apply a kustomization:
+  ```
+  kubectl apply -k <directory>
+  ```
+- Build and view the final manifests:
+  ```
+  kubectl kustomize <directory>
+  ```
+
+**Transformers:**
+
+Transformers (not the ones you are thinking about :) are plugins or built-in features in Kustomize that modify Kubernetes resources in bulk according to specific rules. They allow you to apply changes like adding labels, updating namespaces, or modifying image tags across multiple resources without editing each manifest individually.
+
+**Common Built-in Transformers:**
+- **LabelTransformer:** Adds or modifies labels on all resources.
+- **NamespaceTransformer:** Sets the namespace for resources.
+- **AnnotationTransformer:** Adds or updates annotations.
+- **ImageTransformer:** Updates container image references.
+
+**Example: Adding Labels to All Resources**
+```yaml
+# kustomization.yaml
+commonLabels:
+  app: my-app
+  environment: dev
+```
+
+**Example: Changing Namespace**
+```yaml
+# kustomization.yaml
+namespace: staging
+```
+
+**Custom Transformers:**
+You can write custom transformers as Go plugins or use third-party transformers for advanced use cases. These are referenced in the `kustomization.yaml` under the `transformers` field.
+
+**Example: Using a Custom Transformer**
+```yaml
+transformers:
+  - custom-transformer.yaml
+```
+
+**Patches:**
+
+**Kustomize patches** allow you to modify existing Kubernetes resource manifests without editing the original files. Patches are applied on top of base resources, making it easy to customize configurations for different environments or use cases.
+
+**Types of Patches:**
+- **Strategic Merge Patch:** Merges changes into the target resource using Kubernetes-specific rules. Commonly used for modifying fields like container images, resource limits, or labels.
+- **JSON Patch:** Uses RFC 6902 syntax to specify operations (add, remove, replace) on resource fields.
+- **Patch Transformer:** Applies patches using a transformer defined in the `kustomization.yaml`.
+
+**Example: Strategic Merge Patch**
+
+Suppose you want to change the image and add an environment variable to a Deployment:
+
+```yaml
+# patch.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: my-app
+spec:
+  template:
+    spec:
+      containers:
+        - name: app-container
+          image: my-app:v2
+          env:
+            - name: ENV
+              value: "production"
+```
+
+Reference the patch in your `kustomization.yaml`:
+
+```yaml
+# kustomization.yaml
+patchesStrategicMerge:
+  - patch.yaml
+```
+
+**Example: JSON Patch**
+
+```yaml
+# kustomization.yaml
+patchesJson6902:
+  - target:
+      group: apps
+      version: v1
+      kind: Deployment
+      name: my-app
+    path: json-patch.yaml
+```
+
+```yaml
+# json-patch.yaml
+- op: replace
+  path: /spec/replicas
+  value: 5
+```
+
+**Overlays:**
+
+**Overlays** are a core feature in Kustomize that allow you to customize base Kubernetes manifests for different environments (such as development, staging, or production) without duplicating YAML files. Overlays reference a base configuration and apply patches, transformers, or additional resources to produce environment-specific manifests.
+
+**How Overlays Work:**
+- You define a **base** directory containing the common resource manifests and a `kustomization.yaml`.
+- For each environment, you create an **overlay** directory with its own `kustomization.yaml` that points to the base and specifies patches or customizations.
+- When you build or apply the overlay, Kustomize merges the base resources with the overlay modifications.
+
+**Sample Overlay `kustomization.yaml`:**
+```yaml
+resources:
+  - ../../base
+
+patchesStrategicMerge:
+  - patch.yaml
+
+commonLabels:
+  environment: dev
+```
+
+**Kustomize vs Helm:**
+
+| Feature            | Kustomize                                         | Helm                                         |
+|--------------------|---------------------------------------------------|----------------------------------------------|
+| Approach           | Patch and overlay YAML manifests                   | Package, template, and manage charts         |
+| Templating         | No templating language; uses overlays and patches  | Go templating engine for dynamic values      |
+| Complexity         | Simple, declarative customization                  | Supports complex parameterization            |
+| Packaging          | No chart packaging; works with raw YAML            | Packages resources into charts               |
+| Dependencies       | No dependency management                           | Supports chart dependencies                  |
+| Use Case           | Environment-specific customization, overlays       | Application installation, upgrades, sharing  |
+| Integration        | Built into `kubectl`                               | Separate CLI (`helm`)                        |
+| Learning Curve     | Lower; YAML-based                                  | Higher; requires understanding Helm concepts |
+
+**Summary:**  
+- Use **Kustomize** for straightforward customization and overlays of existing manifests, especially when you want to avoid templating.
+- Use **Helm** when you need packaging, versioning, sharing, and advanced templating for complex applications.
+- Both tools can be used together: Helm charts can be customized further with Kustomize overlays.
+
+**Done with Section 11: Kustomize Basics!**
+
+**Done with CKAD Course Material!**
