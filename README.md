@@ -67,6 +67,35 @@ _Have fun.. and remember, do not get stuck in tutorial hell :)_
 - [Section 6: Pod Design](#section-6-pod-design)
 - [Section 7: Services & Networking](#section-7-services--networking)
 - [Section 8: State Persistence](#section-8-state-persistence)
+- [Section 9: Security](#section-9-security)
+- [Section 10: Helm Fundamentals](#section-10-helm-fundamentals)
+- [Section 11: Kustomize Basics](#section-11-kustomize-basics)
+
+8. [CKA](#cka)
+
+- [Introduction](#introduction)
+- [etcd](#etcd)
+- [kube-api](#kube-api)
+- [kube-controller manager](#kube-controller-manager)
+- [kube-scheduler](#kube-scheduler)
+- [kubelet](#kubelet)
+- [kube-proxy](#kube-proxy)
+- [DaemonSets](#daemonsets)
+- [Static Pods](#static-pods)
+- [Priority Classes](#priority-classes)
+- [Scheduler Profiles](#scheduler-profiles)
+- [Horizontal Pod Autoscaling (HPA)](#horizontal-pod-autoscaling-hpa)
+- [Vertical Pod Autoscaling (VPA)](#vertical-pod-autoscaling-vpa)
+- [In-Place Pod Resize](#in-place-pod-resize-kubernetes-v133)
+- [OS Upgrades](#os-upgrades)
+- [Cluster Upgrade Process](#cluster-upgrade-process)
+- [etcd Backup](#etcd-backup)
+- [TLS in Kubernetes](#tls-in-kubernetes)
+- [KubeConfig](#kubeconfig)
+- [CNI (Container Network Interface)](#cni-container-network-interface)
+- [Service Networking](#service-networking)
+- [DNS in Kubernetes](#dns-in-kubernetes)
+- [Gateway API](#gateway-api)
 
 ### DevOps Overview
 
@@ -2555,3 +2584,1243 @@ commonLabels:
 **Done with Section 11: Kustomize Basics!**
 
 **Done with CKAD Course Material!**
+### CKA
+
+#### Introduction
+
+Since CKAD and CKA share a lot of material in common, this will include only additional material covered by the CKA alone.
+
+#### etcd
+
+**etcd** is a distributed, consistent key-value store that serves as the primary data store for Kubernetes. It is used by the Kubernetes control plane to store all cluster state and configuration data, including information about nodes, pods, secrets, ConfigMaps, and more.
+
+The kube-api server is the only component that interacts with the etcd server directly.
+
+**Key Features:**
+- Strong consistency and high availability using the Raft consensus algorithm.
+- Stores all Kubernetes API objects and cluster metadata.
+- Supports snapshots and data backup/restore for disaster recovery.
+- Provides a simple HTTP/JSON API for reading and writing data.
+
+**kubeadm Setup**
+- In a kubeadm setup, etcd runs as a pod in the kube-system namespace.
+
+**Typical Production Deployment:**
+- Installed as binary
+- Runs as a cluster of odd-numbered nodes (e.g., 3, 5) to tolerate failures.
+- Each Kubernetes cluster has a single etcd cluster, usually managed by the control plane.
+
+**etcdctl**
+
+etcdctl is the CLI tool used to interact with etcd.etcdctl can interact with etcd Server using 2 API versions – Version 2 and Version 3. By default it’s set to use Version 2. Each version has different sets of commands.
+To set the right version of API set the environment variable ETCDCTL_API command
+
+```sh
+export ETCDCTL_API=3
+```
+When the API version is not set, it is assumed to be set to version 2. And version 3 commands listed above don’t work. When API version is set to version 3, version 2 commands listed above don’t work.
+
+Apart from that, you must also specify the path to certificate files so that ETCDCTL can authenticate to the ETCD API Server. The certificate files are available in the etcd-master at the following path. 
+
+**Common etcd Commands:**
+
+- **View cluster health:**  
+  ```sh
+  ETCDCTL_API=3 etcdctl endpoint health \
+    --endpoints=https://127.0.0.1:2379 \
+    --cacert=/etc/kubernetes/pki/etcd/ca.crt \
+    --cert=/etc/kubernetes/pki/etcd/server.crt \
+    --key=/etc/kubernetes/pki/etcd/server.key
+  ```
+- **Get a key/value:**  
+  ```sh
+  ETCDCTL_API=3 etcdctl get <key> \
+    --endpoints=https://127.0.0.1:2379 \
+    --cacert=/etc/kubernetes/pki/etcd/ca.crt \
+    --cert=/etc/kubernetes/pki/etcd/server.crt \
+    --key=/etc/kubernetes/pki/etcd/server.key
+  ```
+- **Put a key/value:**  
+  ```sh
+  ETCDCTL_API=3 etcdctl put <key> <value> \
+    --endpoints=https://127.0.0.1:2379 \
+    --cacert=/etc/kubernetes/pki/etcd/ca.crt \
+    --cert=/etc/kubernetes/pki/etcd/server.crt \
+    --key=/etc/kubernetes/pki/etcd/server.key
+  ```
+- **Delete a key:**  
+  ```sh
+  ETCDCTL_API=3 etcdctl del <key> \
+    --endpoints=https://127.0.0.1:2379 \
+    --cacert=/etc/kubernetes/pki/etcd/ca.crt \
+    --cert=/etc/kubernetes/pki/etcd/server.crt \
+    --key=/etc/kubernetes/pki/etcd/server.key
+  ```
+- **List members:**  
+  ```sh
+  ETCDCTL_API=3 etcdctl member list \
+    --endpoints=https://127.0.0.1:2379 \
+    --cacert=/etc/kubernetes/pki/etcd/ca.crt \
+    --cert=/etc/kubernetes/pki/etcd/server.crt \
+    --key=/etc/kubernetes/pki/etcd/server.key
+  ```
+
+- **Backup:**  
+  ```sh
+  ETCDCTL_API=3 etcdctl snapshot save /tmp/etcd-backup.db \
+    --endpoints=https://127.0.0.1:2379 \
+    --cacert=/etc/kubernetes/pki/etcd/ca.crt \
+    --cert=/etc/kubernetes/pki/etcd/server.crt \
+    --key=/etc/kubernetes/pki/etcd/server.key
+  ```
+  etcd server usually runs in port 2379
+- **Restore:**  
+  ```sh
+  ETCDCTL_API=3 etcdctl snapshot restore /tmp/etcd-backup.db
+  ```
+- **List keys:**  
+  ```sh
+  ETCDCTL_API=3 etcdctl get / --prefix --keys-only
+  ```
+#### kube-api
+  
+Typical flow following a request to the kube-api server:
+
+    1. Authenticate User
+    2. Validate Request
+    3. Retrieve Data
+    4. Update etcd
+    5. Scheduler
+    6. Kubelet
+
+The kube-api server is the only component that interacts with the etcd server directly.
+
+#### kube-controller manager
+
+The **kube-controller manager** is a core Kubernetes control plane component responsible for running controllers—background processes that regulate the state of cluster resources. Each controller watches the Kubernetes API for changes and works to reconcile the actual state with the desired state defined in resource manifests.
+
+**Key Functions:**
+- Runs controllers for resources like Deployments, ReplicaSets, Nodes, Endpoints, ServiceAccounts, and more.
+- Ensures the cluster state matches the specifications (e.g., creates new pods if replicas are missing).
+- Handles node lifecycle management, garbage collection, and resource finalization.
+- Supports leader election for high availability (only one active manager at a time)..
+
+**Configuration:**
+- Runs as a pod in the `kube-system` namespace (in kubeadm setups). Otherwise, runs as a process following the installation of its binaries.
+- Configured via flags (e.g., `--controllers`, `--leader-elect`).
+
+#### kube-scheduler
+
+The **kube-scheduler** is a Kubernetes control plane component responsible for assigning newly created pods to nodes in the cluster. 
+
+It evaluates scheduling requirements such as resource requests, node taints/tolerations, affinity/anti-affinity rules, and other constraints to select the most suitable node for each pod. Once a decision is made, the scheduler updates the pod's specification with the chosen node, allowing the kubelet on that node to start the pod. 
+
+Important note: the kubelet is the one that creates the pod, the schduler just assigns the pod to the respetvive node. It usually does this by filling the `.spec.nodeName` field.
+
+**Configuration:**
+- Runs as a pod in the `kube-system` namespace (in kubeadm setups). Otherwise, runs as a process following the installation of its binaries.
+
+#### kubelet
+
+The **kubelet** is the primary node agent in Kubernetes. It runs on every node in the cluster and is responsible for managing the lifecycle of containers as defined by Pod specifications. The kubelet communicates with the Kubernetes API server to receive instructions and reports node and pod status back to the control plane.
+
+**Key Functions:**
+- Watches for Pod specs assigned to its node and ensures the containers are running as described.
+- Interacts with the container runtime (e.g., containerd, CRI-O) to start, stop, and monitor containers.
+- Performs health checks and readiness probes for containers.
+- Manages pod volumes and mounts.
+- Reports node and pod status to the API server.
+- Handles node-level operations such as resource management and garbage collection.
+
+**Configuration:**
+- In kubeadm setups, kubelet is **not** automatically deployed (unlike other components). You must manually install its binaries.
+- Runs as a process on each node following the installation of its binaries.
+
+#### kube-proxy
+
+The **kube-proxy** is a network component that runs on every node in a Kubernetes cluster. Its primary role is to manage network rules that allow communication to and from pods, implementing the Kubernetes Service abstraction.
+
+**Key Functions:**
+- Maintains network rules (using iptables, IPVS, or userspace proxying) to route traffic destined for Services to the appropriate backend pods.
+- Enables load balancing across pod replicas for each Service.
+- Handles both internal cluster traffic and external access (for NodePort and LoadBalancer Services).
+- Watches the Kubernetes API for Service and Endpoint changes, updating rules dynamically.
+
+**How It Works:**
+- For each Service, kube-proxy sets up rules so that requests to the Service's IP go to the pod's IP, as the service is not part of the CNI (i.e, its a virtual component). It does this by maintaining iptables rules.
+
+**Configuration:**
+- Runs as a deamonset in the `kube-system` namespace (in kubeadm setups). Otherwise, runs as a process in each node following the installation of its binaries.
+
+#### DaemonSets
+
+A **DaemonSet** is a Kubernetes controller that ensures a specific pod runs on every (or selected) node in the cluster. Unlike Deployments, which manage a variable number of replicas, DaemonSets guarantee that exactly one pod is scheduled per node. This is ideal for workloads that need to run on all nodes, such as log collectors, monitoring agents, or networking tools.
+
+**Key Features:**
+- Automatically adds a pod to new nodes as they join the cluster.
+- Removes pods from nodes when they are removed from the cluster.
+- Can be restricted to specific nodes using node selectors, affinity, or taints/tolerations.
+
+**Common Use Cases:**
+- Cluster-wide log shipping (e.g., Fluentd, Filebeat)
+- Monitoring agents (e.g., Prometheus Node Exporter)
+- Network plugins (e.g., Calico, Cilium)
+- Storage daemons
+
+**Example DaemonSet Manifest:**
+```yaml
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: node-monitor
+spec:
+  selector:
+    matchLabels:
+      app: node-monitor
+  template:
+    metadata:
+      labels:
+        app: node-monitor
+    spec:
+      containers:
+        - name: monitor
+          image: monitoring-agent:latest
+```
+
+**Useful Commands:**
+- List DaemonSets: `kubectl get daemonsets`
+- Describe a DaemonSet: `kubectl describe daemonset <name>`
+- View pods created by a DaemonSet: `kubectl get pods -l app=node-monitor`
+
+**Notes:**
+- DaemonSets do not support rolling updates by default; use the `updateStrategy` field for controlled updates.
+- Pods managed by DaemonSets are not deleted when the DaemonSet is deleted unless specified with `kubectl delete --cascade`.
+
+#### Static Pods
+
+**Static Pods** are pods managed directly by the kubelet on a node, rather than by the Kubernetes API server or controllers like Deployments or DaemonSets. They are defined by placing a pod manifest file in a specific directory on the node (usually `/etc/kubernetes/manifests`). The kubelet watches this directory and automatically creates, updates, or deletes pods based on the files present.
+
+**Key Characteristics:**
+- Not managed by the Kubernetes control plane; no API object is created for them.
+- Useful for running critical system components (e.g., control plane pods in single-node clusters).
+- Automatically restarted by the kubelet if they fail.
+- No higher-level controllers (e.g., ReplicaSet, Deployment) manage their lifecycle.
+- Appear in `kubectl get pods -A` under the node's namespace, but cannot be managed with `kubectl delete pod`.
+
+**How to Use:**
+1. Place a pod manifest YAML file in the kubelet's static pod path (default: `/etc/kubernetes/manifests`). The path is passed to the kubelet service via `--pod-manifest-path` option or via a `config` file under `staticPodPath` option.
+2. The kubelet detects the file and creates the pod.
+3. To update or remove the pod, edit or delete the manifest file.
+
+**Common Use Cases:**
+- Bootstrapping control plane components (API server, controller manager, scheduler) in kubeadm clusters.
+- Running node-local agents or monitoring tools outside of Kubernetes orchestration.
+
+**Notes:**
+- Static pods are not scheduled; they always run on the node where their manifest resides.
+- The kubelet automatically creates a mirror pod object in the API server for visibility, but it cannot be managed like regular pods.
+- For most workloads, prefer using Deployments, DaemonSets, or other controllers.
+
+#### Priority Classes
+
+**Priority Classes** in Kubernetes are a way to assign relative importance to pods, influencing the order in which pods are scheduled and evicted during resource shortages. Pods with higher priority are scheduled before lower-priority pods and are less likely to be evicted when the node runs out of resources.
+
+**How Priority Classes Work:**
+- You define PriorityClass resources with a `value` (integer between -2 billion and 1 billion) and an optional `globalDefault` flag.
+- Pods reference a PriorityClass by name in their spec (`priorityClassName`).
+- The scheduler uses the priority value to decide which pods to schedule first.
+- During eviction (e.g., due to node pressure), lower-priority pods are evicted before higher-priority ones.
+
+**Example PriorityClass Manifest:**
+```yaml
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: high-priority
+value: 100000
+globalDefault: false
+description: "This priority class is for critical workloads."
+preemptionPolicy: PreemptLowerPriority # evict lower-priority pods if needed
+```
+#### Scheduler Profiles
+
+**Scheduler Profiles** in Kubernetes allow you to configure multiple scheduling policies within a single cluster. Each profile can have its own set of plugins and configuration options, enabling different scheduling behaviors for different workloads.
+
+**Scheduling Plugins:**
+- Scheduling Queue -> PrioritySort
+- Filtering -> NodeResourcesFit, NodeName, NodeUnschedulable
+- Scoring -> NodeResourcesFit, ImageLocality
+- Binding -> DefaultBinder
+
+**Key Features:**
+- Multiple profiles can be defined in the kube-scheduler configuration.
+- Pods can select a scheduler profile by setting the `schedulerName` field in their spec.
+- Each profile can enable or disable scheduling plugins, set plugin arguments, and customize scheduling logic.
+
+**Use Cases:**
+- Run workloads with different scheduling requirements (e.g., latency-sensitive vs. batch jobs).
+- Apply custom scheduling plugins for specific namespaces or applications.
+- Separate scheduling logic for system and user workloads.
+
+**Example kube-scheduler configuration:**
+```yaml
+apiVersion: kubescheduler.config.k8s.io/v1
+kind: KubeSchedulerConfiguration
+profiles:
+  - schedulerName: default-scheduler
+    plugins:
+      score:
+        enabled:
+          - name: NodeResourcesBalancedAllocation
+  - schedulerName: batch-scheduler
+    plugins:
+      score:
+        enabled:
+          - name: NodeResourcesLeastAllocated
+```
+
+**Notes:**
+- Scheduler profiles are configured via the kube-scheduler's config file (not via API objects).
+- If no `schedulerName` is specified, the default profile is used.
+
+#### Horizontal Pod Autoscaling (HPA)
+
+**Horizontal Pod Autoscaling (HPA)** in Kubernetes automatically adjusts the number of pod replicas in a Deployment, ReplicaSet, or StatefulSet based on observed metrics such as CPU utilization, memory usage, or custom metrics. This enables applications to scale out (add pods) or scale in (remove pods) in response to changing load, improving resource efficiency and application availability.
+
+**How HPA Works:**
+- The HPA controller periodically checks metrics from the Metrics Server or custom sources.
+- If the observed metric (e.g., average CPU usage) exceeds the target threshold, HPA increases the replica count.
+- If usage drops below the threshold, HPA decreases the replica count, down to a specified minimum.
+
+**Key Fields:**
+- `minReplicas`: Minimum number of pods.
+- `maxReplicas`: Maximum number of pods.
+- `metrics`: Metric(s) to monitor (CPU, memory, or custom).
+
+**Example HPA Manifest:**
+```yaml
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: nginx-hpa
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: nginx
+  minReplicas: 2
+  maxReplicas: 10
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 50
+```
+
+**Commands:**
+- Create HPA:  
+  `kubectl autoscale deployment nginx --cpu-percent=50 --min=2 --max=10`
+- View HPA status:  
+  `kubectl get hpa`
+- Describe HPA:  
+  `kubectl describe hpa <name>`
+
+**Requirements:**
+- HPA comes built in with Kubernetes since version 1.23.
+- Metrics Server must be deployed in the cluster for CPU/memory-based autoscaling.
+- For custom metrics, additional setup is required (e.g., Prometheus Adapter).
+
+**Notes:**
+- HPA only scales pods horizontally (replica count); for vertical scaling (resource requests/limits), use Vertical Pod Autoscaler (VPA).
+- HPA does not scale nodes; use Cluster Autoscaler for node-level scaling.
+
+#### Vertical Pod Autoscaling (VPA)
+
+**Vertical Pod Autoscaling (VPA)** in Kubernetes automatically adjusts the resource requests and limits (CPU and memory) for pods based on observed usage. Unlike HPA, which changes the number of pod replicas, VPA modifies the resource allocation for each pod to optimize performance and resource utilization.
+
+**How VPA Works:**
+- Continuously monitors pod resource usage.
+- Recommends or applies updated resource requests/limits.
+- When an update is needed, VPA may evict and restart pods with new resource settings.
+
+**Key Components:**
+- **VPA Admission Controller:** Mutates pod specs on creation to set recommended resources.
+- **VPA Recommender:** Analyzes metrics and suggests optimal resource values.
+- **VPA Updater:** Optionally evicts pods to apply new resource settings.
+
+**Example VPA Manifest:**
+```yaml
+apiVersion: autoscaling.k8s.io/v1
+kind: VerticalPodAutoscaler
+metadata:
+  name: nginx-vpa
+spec:
+  targetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: nginx
+  updatePolicy:
+    updateMode: "Auto" # "Off", "Initial", or "Auto"
+```
+
+**Update Modes:**
+- `Off`: VPA only recommends resources; does not apply changes.
+- `Initial`: Sets resources only at pod creation.
+- `Auto`: Actively updates running pods by evicting and recreating them.
+
+**Commands:**
+- View VPA recommendations:  
+  `kubectl describe vpa <name>`
+- List VPA objects:  
+  `kubectl get vpa`
+
+**Notes:**
+- VPA and HPA can conflict if both manage CPU/memory; use with care.
+- VPA requires the VPA controller to be installed (not part of default Kubernetes).
+- Best for workloads with unpredictable or variable resource needs.
+
+#### In-Place Pod Resize (Kubernetes v1.33)
+
+**In-place Pod Resize** is a feature graduated to beta in Kubernetes v1.33 that allows you to update the resource requests and limits (CPU and memory) of running pods without needing to delete and recreate them. Previously, changing these resources required pod eviction and recreation, which could disrupt workloads and cause downtime.
+
+**How it works:**
+- The spec.containers[*].resources field in a Pod specification now represents the desired resources and is mutable for CPU and memory.
+- The status.containerStatuses[*].resources field reflects the actual resources currently configured on a running container.
+- You can trigger a resize by updating the desired resources in the Pod spec via the new resize subresource.
+
+**Example:**
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: resize-demo
+spec:
+  containers:
+  - name: pause
+    image: registry.k8s.io/pause:3.8
+    resizePolicy:
+    - resourceName: cpu
+      restartPolicy: NotRequired # Default, but explicit here
+    - resourceName: memory
+      restartPolicy: RestartContainer
+    resources:
+      limits:
+        memory: "200Mi"
+        cpu: "700m"
+      requests:
+        memory: "200Mi"
+        cpu: "700m"
+```
+
+**Limitations:**
+
+Limitations of In-Place Pod Resize at the time of writing this:
+
+- Only CPU and memory resources can be resized.
+- If the memory resize restart policy is NotRequired (or unspecified), the kubelet will make a best-effort attempt to prevent oom-kills when decreasing memory limits, but doesn't provide any guarantees. Before decreasing container memory limits, if memory usage exceeds the requested limit, the resize will be skipped and the status will remain in an "In Progress" state. This is considered best-effort because it is still subject to a race condition where memory usage may spike right after the check is performed.
+- The Pod's original Quality of Service (QoS) class (Guaranteed, Burstable, or BestEffort) is determined at creation and cannot be changed by a resize.
+- Non-restartable init containers and ephemeral containers cannot be resized. Sidecar containers can be resized.
+- Resource requests and limits cannot be entirely removed once set; they can only be changed to different values.
+- Windows pods do not support in-place resize.
+
+#### OS Upgrades
+
+Upgrading the operating system on Kubernetes nodes requires careful coordination to avoid disrupting workloads. The recommended approach is to gracefully evict pods from the node before performing the upgrade, then bring the node back into service.
+
+**Typical Steps:**
+
+1. **Cordon the Node:**  
+  Prevent new pods from being scheduled on the node.
+  ```sh
+  kubectl cordon <node-name>
+  ```
+
+2. **Drain the Node:**  
+  Evict all pods (except DaemonSet and mirror pods) from the node.
+  ```sh
+  kubectl drain <node-name> --ignore-daemonsets --delete-emptydir-data
+  ```
+  - `--ignore-daemonsets`: Leaves DaemonSet-managed pods running.
+  - `--delete-emptydir-data`: Allows deletion of pods using emptyDir volumes.
+
+3. **Perform OS Upgrade:**  
+  Upgrade the OS using your preferred method (e.g., package manager, image replacement).
+
+4. **Uncordon the Node:**  
+  Allow pods to be scheduled on the node again.
+  ```sh
+  kubectl uncordon <node-name>
+  ```
+
+**Best Practices:**
+- Upgrade nodes one at a time to maintain cluster availability.
+- Monitor workloads and node status during the process.
+- Consider using node pools or autoscaling groups for rolling upgrades in managed environments.
+
+#### Cluster Upgrade Process
+
+The different components of the control plane can be of different versions:
+
+- `kube-apiserver` must be in a version higher than the remaining components. 
+- The `controller-manager` and `scheduler` can be at one version lower. 
+- `kubelet` and `kube-proxy` can be at two versions lower.
+- `kubectl` can be +- 1 versions from the `kube-apiserver`.
+
+This version-skewness allows us to perform live upgrades.
+
+#### Upgrade Steps
+
+These steps don't apply in the same order for kubeadm as it handles most upgrades for you. You would only have to upgrade the `kubelet` manually. Refer to the documentation for the exact steps.
+
+1. **Check for Deprecated APIs:**  
+  Before upgrading, use tools like [`kubent`](https://github.com/doitintl/kube-no-trouble) to identify deprecated API versions in your manifests and cluster resources. Update them to supported versions.
+
+2. **Upgrade the Control Plane:**  
+  - Upgrade the `kube-apiserver` first, as it must be at the highest version.
+  - Upgrade `kube-controller-manager` and `kube-scheduler` next. These can lag one minor version behind the API server.
+  - If using kubeadm, run `kubeadm upgrade plan` to see upgrade paths and then `kubeadm upgrade apply <version>` to upgrade the control plane. Note: you must upgrade kubeadm before running the `kubeadm upgrade` commands.
+
+3. **Upgrade Node Components:**  
+  - Upgrade `kubelet` and `kube-proxy` on each node. These can be up to two minor versions behind the API server.
+
+4. **Upgrade Add-ons and CRDs:**  
+  - Update cluster add-ons (e.g., CoreDNS, CNI plugins, metrics server) to compatible versions.
+  - Upgrade Custom Resource Definitions (CRDs) if needed.
+
+**In a kubeadm setup, there are two main downtime-free strategies to upgrade kubelet in worker nodes:**
+  - One node at a time by draining each node, upgrading it, then uncordoning it.
+  - Spinning up new nodes with the new version (if in a cloud set up or one with extra nodes).
+
+**Best Practices:**
+- Always back up etcd before starting the upgrade.
+- Upgrade one component at a time and monitor for issues.
+- Review release notes for breaking changes and migration steps.
+- For managed clusters, follow the cloud provider's upgrade documentation.
+#### etcd Backup
+
+Backing up etcd is critical for disaster recovery and cluster restoration. The recommended method is to take a snapshot of the etcd data using the `etcdctl snapshot save` command. This creates a point-in-time backup of the entire key-value store.
+
+**Example: Save a snapshot**
+```sh
+etcdctl snapshot save /tmp/etcd-backup.db \
+  --endpoints=https://127.0.0.1:2379 \
+  --cacert=/etc/kubernetes/pki/etcd/ca.crt \
+  --cert=/etc/kubernetes/pki/etcd/server.crt \
+  --key=/etc/kubernetes/pki/etcd/server.key
+```
+
+**Restoring from a snapshot**
+```sh
+etcdutl --data-dir <data-dir-location> snapshot restore /tmp/etcd-backup.db
+```
+
+**Best Practices:**
+- Store snapshots securely and off-node.
+- Automate regular backups.
+- Always back up etcd before cluster upgrades or major changes.
+
+#### TLS in Kubernetes
+
+Transport Layer Security (TLS) is fundamental to securing communication within a Kubernetes cluster. TLS is used for encrypting traffic, authenticating clients and servers, and establishing trust between components.
+
+##### Certificate Authorities (CA)
+
+A **Certificate Authority (CA)** is a trusted entity that issues digital certificates. In Kubernetes, the CA is responsible for signing certificates used by the API server, kubelets, controllers, and other components. The CA's root certificate is distributed to all cluster nodes and clients to establish trust.
+
+- The CA private key and certificate are typically stored in `/etc/kubernetes/pki/ca.key` and `/etc/kubernetes/pki/ca.crt`.
+- All certificates used by cluster components are signed by this CA.
+
+##### Server Certificates
+
+**Server certificates** authenticate the identity of servers (e.g., kube-apiserver, etcd, kubelet) and enable encrypted communication.
+
+- The API server presents a server certificate to clients (kubectl, kubelet, controllers) to prove its identity.
+- Server certificates are signed by the cluster CA and include the server's DNS names and IP addresses in the Subject Alternative Name (SAN) field.
+- Example: `/etc/kubernetes/pki/apiserver.crt` and `/etc/kubernetes/pki/apiserver.key`.
+
+##### Client Certificates
+
+**Client certificates** authenticate users and components to the API server.
+
+- Users (admins, automation tools) and components (kubelet, controller-manager, scheduler) use client certificates to prove their identity when connecting to the API server.
+- Client certificates are signed by the cluster CA and include the user's or component's identity in the Common Name (CN) field.
+- Example: `/etc/kubernetes/pki/kubelet-client.crt` and `/etc/kubernetes/pki/kubelet-client.key`.
+
+##### Mutual TLS (mTLS)
+
+Kubernetes uses **mutual TLS (mTLS)** for authentication between components. Both the client and server present certificates signed by the CA, allowing each to verify the other's identity.
+
+- The API server requires client certificates for authentication from kubelets and controllers.
+- etcd uses mTLS for secure communication between cluster members and clients.
+
+##### Certificate Bootstrapping
+
+Kubelets can use **certificate bootstrapping** to request client certificates from the API server. The process involves:
+
+1. Kubelet starts with a bootstrap token.
+2. Kubelet requests a client certificate from the API server's `/certificatesigningrequests` API.
+3. The request is approved (manually or automatically), and the signed certificate is returned.
+
+##### Certificate Rotation
+
+Kubernetes supports **automatic certificate rotation** for kubelets and other components. Certificates are renewed before expiration to maintain secure communication.
+
+##### TLS in kubeconfig
+
+The `kubeconfig` file uses TLS certificates for authentication:
+
+```yaml
+users:
+  - name: admin
+    user:
+      client-certificate: /etc/kubernetes/pki/admin.crt
+      client-key: /etc/kubernetes/pki/admin.key
+clusters:
+  - name: my-cluster
+    cluster:
+      certificate-authority: /etc/kubernetes/pki/ca.crt
+      server: https://api-server:6443
+```
+
+##### Certificates API
+
+The **Certificates API** in Kubernetes provides a way for users and components to request, approve, and manage X.509 certificates for secure communication within the cluster. It is commonly used for kubelet client certificate bootstrapping and other scenarios where automated certificate issuance is needed. It is handled by the controller manager component.
+
+**Key Resource:**
+- `CertificateSigningRequest` (CSR): Represents a certificate request. Users or components submit a CSR, which can then be approved or denied by a cluster administrator.
+
+**Typical Workflow:**
+1. **Create a CSR:**  
+  A user or component submits a CSR object containing a PEM-encoded certificate signing request.
+  ```yaml
+  apiVersion: certificates.k8s.io/v1
+  kind: CertificateSigningRequest
+  metadata:
+    name: my-csr
+  spec:
+    request: <base64-encoded-CSR>
+    signerName: kubernetes.io/kube-apiserver-client
+    usages:
+     - digital signature
+     - key encipherment
+     - client auth
+  ```
+2. **Approve or Deny the CSR:**  
+  An admin reviews and approves or denies the CSR.
+  ```
+  kubectl certificate approve my-csr
+  kubectl certificate deny my-csr
+  ```
+3. **Retrieve the Signed Certificate:**  
+  Once approved, the signed certificate is available in the CSR's status.
+  ```
+  kubectl get csr my-csr -o jsonpath='{.status.certificate}' | base64 --decode > client.crt
+  ```
+
+**Useful Commands:**
+- List CSRs: `kubectl get csr`
+- View CSR details: `kubectl describe csr <name>`
+- Approve a CSR: `kubectl certificate approve <name>`
+- Deny a CSR: `kubectl certificate deny <name>`
+
+##### Securing Ingress and Services
+
+- Ingress controllers use TLS certificates for HTTPS traffic termination. Certificates are stored as Kubernetes secrets and referenced in Ingress resources.
+- Internal services can use TLS for pod-to-pod encryption, often managed by service meshes (e.g., Istio, Linkerd).
+
+##### Useful Commands
+
+- View API server certificate details:
+  ```
+  openssl x509 -in /etc/kubernetes/pki/apiserver.crt -text -noout
+  ```
+- List certificate signing requests:
+  ```
+  kubectl get csr
+  ```
+- Approve a CSR:
+  ```
+  kubectl certificate approve <csr-name>
+  ```
+  #### KubeConfig 
+
+  A **kubeconfig** file is the central configuration file used by `kubectl` and other Kubernetes clients to authenticate, select clusters, users, and contexts, and manage access to multiple clusters.
+
+  **Key Sections:**
+  - `clusters`: Defines cluster endpoints and CA certificates.
+  - `users`: Stores authentication info (certs, tokens, etc.).
+  - `contexts`: Associates a user with a cluster and namespace.
+  - `current-context`: Specifies the default context for commands.
+
+  **Default Location:**  
+  `~/.kube/config` (can be overridden with `--kubeconfig`).
+
+  **Switching Contexts:**
+  ```sh
+  kubectl config use-context <context-name>
+  ```
+
+  **Setting Namespace:**
+  ```sh
+  kubectl config set-context --current --namespace=<namespace>
+  ```
+
+  **Merging Multiple Kubeconfigs:**
+  Set the `KUBECONFIG` environment variable with a colon-separated list of files:
+  ```sh
+  export KUBECONFIG=~/.kube/config:/path/to/other/config
+  kubectl config view --merge
+  ```
+
+  **Creating a kubeconfig for a ServiceAccount:**
+  1. Create a ServiceAccount and RoleBinding.
+  2. Extract the token and CA certificate from the ServiceAccount secret.
+  3. Build a kubeconfig referencing the cluster, user (token), and context.
+
+  **Example:**
+  ```yaml
+  apiVersion: v1
+  kind: Config
+  clusters:
+  - name: my-cluster
+    cluster:
+      server: https://1.2.3.4:6443
+      certificate-authority-data: <base64-encoded-ca.crt>
+  users:
+  - name: my-user
+    user:
+      token: <service-account-token>
+  contexts:
+  - name: my-context
+    context:
+      cluster: my-cluster
+      user: my-user
+      namespace: default
+  current-context: my-context
+  ```
+
+  **Tips:**
+  - Use `kubectl config view` to inspect your config.
+  - Use `kubectl config get-contexts` to list available contexts.
+  - Use `kubectl config set-credentials` to update user credentials.
+
+#### CNI (Container Network Interface)
+
+**CNI (Container Network Interface)** is a specification and set of libraries for configuring network interfaces in Linux containers. In Kubernetes, CNI is the standard for implementing pod networking, enabling communication between pods across nodes in a cluster.
+
+**How CNI Works in Kubernetes:**
+- When a pod is scheduled on a node, the kubelet calls the CNI plugin to set up networking for the pod.
+- The CNI plugin creates a network interface for the pod, assigns an IP address, and configures routing so the pod can communicate with other pods and external networks.
+- CNI plugins are responsible for both pod-to-pod networking and network policy enforcement (if supported).
+
+**Popular CNI Plugins:**
+- **Calico:** Provides networking and network policy, supports both layer 3 routing and overlay networks.
+- **Flannel:** Simple overlay network, easy to set up for basic networking.
+- **Cilium:** Uses eBPF for high-performance networking and advanced security policies.
+- **Weave Net:** Mesh-based overlay network with encryption support.
+- **Canal:** Combines Flannel for networking and Calico for network policy.
+
+**Key Concepts:**
+- **Pod Network:** All pods in a cluster can communicate with each other without NAT.
+- **Network Policies:** Some CNI plugins support Kubernetes NetworkPolicy resources for controlling traffic.
+- **CNI Configuration:** CNI plugins are configured via JSON files in `/etc/cni/net.d/` on each node.
+
+**CNI Plugin Lifecycle:**
+1. Pod is created.
+2. Kubelet invokes the CNI plugin with the pod's details.
+3. Plugin sets up the network interface and IP address.
+4. When the pod is deleted, the plugin cleans up the network resources.
+
+**Commands:**
+- View CNI configuration:  
+  `cat /etc/cni/net.d/*`
+- Check CNI plugin pods:  
+  `kubectl get pods -n kube-system`
+
+**Notes:**
+- Kubernetes does not provide a default CNI plugin; you must install one for pod networking to work.
+- The choice of CNI plugin affects features like network policy, performance, and compatibility.
+
+#### CNI networking — what it does, how it works (namespaces, drivers, pod & cluster context)
+
+##### 1) Purpose & high-level model
+- The Container Network Interface (CNI) is a pluggable specification + small binaries used by kubelet/container runtimes to attach containers (pods) to a cluster network.
+- Goal: give every Pod an IP (and connectivity) so:
+  - Pod-to-Pod: any pod can reach any other pod (IP-per-pod flat addressing model) unless policies restrict it.
+  - Node-to-Pod: nodes forward traffic to pods.
+  - Services, Ingress, external access layered on top (kube-proxy / Service mesh / Gateway).
+
+##### 2) CNI lifecycle and operations
+- Kubernetes (kubelet) invokes CNI binaries on lifecycle events:
+  - ADD — create networking for a container (allocate IP, create interfaces, program routes/rules).
+  - DEL — tear down networking and release IP.
+  - CHECK (optional) — verify network status.
+- Invocation parameters (stdin JSON) include:
+  - container ID
+  - netns (path to container's network namespace)
+  - ifName (interface name inside the netns)
+  - args (e.g., K8S_POD_NAME, K8S_POD_NAMESPACE)
+  - CNI config file (from /etc/cni/net.d)
+- CNI binaries reside on the node (commonly /opt/cni/bin) and are chained by a CNI config that may include plugins and IPAM.
+
+##### 3) Network namespaces & interfaces
+- Linux network namespace (netns) isolates network stacks per Pod/container.
+  - Each Pod typically has its own network namespace (unless hostNetwork: true).
+  - Within the Pod netns you usually see a single interface (eth0) with the Pod IP and loopback.
+- veth pairs:
+  - CNI creates a veth pair: one end moved into the Pod's netns (peer named e.g., eth0), the other end remains in the host namespace.
+  - Host-side veth is attached to a bridge, routing table, or CNI datapath plugin.
+- Bridge mode:
+  - Host veth is attached to a Linux bridge; bridge routes/bridges traffic among host and other veths.
+- Routing mode:
+  - Host programs routes (and optionally policy routing) to route Pod IP ranges between nodes.
+
+##### 4) IPAM (IP Address Management)
+- IPAM plugins allocate and release Pod IPs, persist allocations.
+- Modes:
+  - Host-local (local file/database per-node)
+  - External/centralized (Calico, Cilium, cloud VPC IPAM)
+- IPAM returns IP address, gateway, routes and optional DNS info to the ADD call.
+
+##### 5) Types of CNI drivers / datapaths (and trade-offs)
+- Overlay tunnels (encapsulation) 
+  - Overlay is a virtual network that tunnels traffic across hosts over the existing network infrastructure.
+  - VXLAN, Geneve, IP-in-IP: encapsulate Pod traffic between nodes.
+  - Pros: works on any L2, easier to deploy across clouds; cons: MTU overhead, CPU cost.
+  - Example plugins: Flannel (VXLAN mode), Canal (Flannel + Calico), Weave (mesh overlay).
+- Routed / L3 (no encapsulation)
+  - Assigns routable IPs or programs routes between node subnets (Calico in BGP mode, Cilium with routing).
+  - Pros: lower overhead, can use BGP for scale; cons: requires L3 config and routing support in infra.
+- eBPF-powered datapath
+  - Uses eBPF to implement forwarding/policing at kernel level (Cilium).
+  - Pros: high performance, flexible policy, observability hooks.
+- Bridge (simple L2)
+  - Simple host bridge connecting veths on same node; cross-node uses overlay or routing.
+- Host-local plugin vs managed (cloud) plugins
+  - Cloud providers may provide VPC-native CNIs that integrate with cloud networking (AWS VPC CNI).
+- Overlay vs Routed
+  - Routed (L3): The original pod packet travels through the network with routing decisions made based on the pod's IP.
+  - Overlay: The original pod packet is hidden inside another packet, and routing decisions are made based only on the node's IP.
+
+##### 6) How CNI integrates into Kubernetes cluster networking
+- Pod network model:
+  - Each Pod gets an IP from the cluster (or node-specific) CIDR.
+  - Node-level routing or overlay ensures that reaching a Pod IP is independent of node.
+- kubelet + container runtime:
+  - When runtime creates container, kubelet calls CNI ADD with netns; after return, container has its network configured.
+- Services vs Pod IPs:
+  - Service ClusterIP is virtual; kube-proxy (iptables, IPVS) or L4/L7 proxies implement service IP -> pod endpoint mapping.
+  - CNI is responsible for Pod IP reachability; kube-proxy handles service NAT/load-balancing.
+
+##### 7) NetworkPolicies and enforcement
+- NetworkPolicy is a Kubernetes API object (declarative rules).
+- Enforcement is implemented by the CNI plugin (or by an attached-network-policy engine):
+  - iptables/iptables-save rules (older plugins)
+  - ipset + iptables
+  - eBPF programs (Cilium) for higher performance and richer semantics.
+- Default behavior: if no NetworkPolicy selects a pod, traffic is allowed. When policies select pods, unspecified traffic is denied (default deny effect when policies exist).
+- CNI plugins interpret NetworkPolicy semantics and program the kernel accordingly.
+
+##### 8) Multitenancy, namespaces, and isolation
+- Kubernetes namespaces are logical groupings; CNI enforces network isolation via:
+  - NetworkPolicy that can be scoped to NamespaceSelector.
+  - Multi-tenant CNIs may implement per-namespace VNIs or VRFs.
+- Network namespaces are OS-level constructs separate from Kubernetes namespaces; a Kubernetes namespace maps to many pods/containers each with their own netns.
+
+##### 9) Overlay details, MTU and fragmentation
+- Encapsulation reduces effective MTU — adjust MTU on veth and overlay to prevent fragmentation.
+- Debug symptom: large transfers fail or high latency — check MTU and offload settings.
+
+##### 10) Special cases & features
+- hostNetwork: true
+  - Pod uses node network namespace; no CNI veth created; Pod shares host IP.
+- Multus / multiple interfaces
+  - Multus acts as a meta-CNI to attach multiple networks/interfaces to Pods (e.g., secondary NICs for SR-IOV, macvlan).
+- SR-IOV / macvlan
+  - Bypass kernel networking for NIC performance; special CNI drivers allocate hardware VF to pod netns.
+- Hairpin mode
+  - Allows a pod to send traffic to a Service IP that resolves back to the same node/pod and get hairpinned back to the same pod; driver/bridge must support hairpin.
+
+##### 11) Implementation details (what a CNI config looks like)
+- /etc/cni/net.d/*.conf (JSON/YAML) describes plugin chain and IPAM:
+```json
+{
+  "cniVersion": "0.4.0",
+  "name": "my-cluster-net",
+  "plugins": [
+    {
+      "type": "calico",
+      "log_level": "info",
+      "etcd_endpoints": "https://..."
+    },
+    {
+      "type": "portmap",
+      "capabilities": {"portMappings": true}
+    }
+  ]
+}
+```
+- The first plugin handles allocation and datapath, later plugins (portmap, firewall) perform extra actions.
+
+##### 12) Routing / node-level behavior
+- Per-node routing table often contains routes for remote pod CIDRs routed via:
+  - Overlay tunnel endpoints (VXLAN) on node IPs, or
+  - BGP-peered routes advertising pod subnets (Calico BGP), or
+  - IP routing via encapsulation-less L3 routing.
+- Kube-proxy and CNI cooperate: CNI provides reachability to Pod IP, kube-proxy provides Service-level NAT/load balancing.
+
+##### 13) Observability & debugging
+- Check CNI config: /etc/cni/net.d/
+- Check CNI binaries: /opt/cni/bin/
+- Inspect namespaces and interfaces:
+  - ip netns list
+  - ip netns exec <netns> ip addr
+  - ip link show
+- Check node routes and bridge:
+  - ip route show
+  - brctl show (or bridge link)
+- Examine CNI/plugin logs (systemd or kubelet logs) and plugin-specific daemon pods (Calico, Cilium, Flannel).
+- Tools: tcpdump on host/veth, ss/iptables/ipvsadm to view rules.
+
+##### 14) Compatibility & security notes
+- CNI spec is stable; plugins evolve. Keep CNI plugin versions compatible with Kubernetes and kernel.
+- Network plugins can run with elevated privileges (CAP_NET_ADMIN); secure the control plane and RBAC controlling who can install CNIs.
+- NetworkPolicy does not encrypt traffic — use mTLS or service meshes for pod-to-pod encryption, or IPsec-capable CNIs for link-level encryption.
+
+Summary: CNI is the modular bridge between container runtimes and cluster network design. It handles netns wiring, IP allocation, datapath programming (bridges, tunnels, routes, eBPF), and policy enforcement. The cluster-level behavior (flat Pod addressing, cross-node routing, Service abstraction) emerges by combining CNI datapath, IPAM, kubelet orchestration, and kube-proxy/service or higher-level service meshes.
+
+#### Service Networking
+
+Service networking in Kubernetes enables communication between pods and provides stable endpoints for applications. The key component responsible for implementing service networking is **kube-proxy**.
+
+##### How Services Work
+
+1. **Service Creation:**
+  - When a Service is created, it gets a virtual IP (ClusterIP) from the service CIDR range.
+  - The ClusterIP is purely virtual - no interface has this IP.
+  - The API server stores the service information in etcd.
+
+2. **Endpoint Creation:**
+  - An Endpoints controller watches for Services and Pods.
+  - When a Service is created, it identifies Pods matching the Service's selector.
+  - Creates Endpoint objects listing the IPs of matching Pods.
+
+3. **kube-proxy Operation:**
+  - Runs on every node as a DaemonSet or system process.
+  - Watches Services and Endpoints.
+  - Creates network rules to redirect traffic from Service IP to Pod IPs.
+  - Supports different proxy modes.
+
+##### kube-proxy Modes
+
+**1. Userspace Mode (legacy):**
+  - Runs proxy server in userspace.
+  - Installs iptables rules to redirect service traffic to this proxy.
+  - Proxy load balances connections to backend pods.
+  - Least efficient due to multiple userspace-kernel transitions.
+
+**2. iptables Mode (default):**
+  - Uses Linux kernel iptables for all proxy operations.
+  - Creates DNAT rules to redirect service IPs to specific pods.
+  - Random pod selection for load balancing.
+  - Better performance than userspace mode.
+  
+  Example rules:
+  ```sh
+  # Redirect service traffic to pod
+  -A KUBE-SERVICES -d 10.0.1.1/32 -j KUBE-SVC-XXX
+  -A KUBE-SVC-XXX -j KUBE-SEP-YYY
+  -A KUBE-SEP-YYY -j DNAT --to-destination 192.168.1.2:80
+  ```
+
+**3. IPVS Mode:**
+  - Uses Linux kernel IPVS (IP Virtual Server) for load balancing.
+  - Supports more load balancing algorithms.
+  - Better performance for large clusters.
+  - Requires kernel modules.
+  
+  Example configuration:
+  ```sh
+  ipvsadm -ln
+  IP Virtual Server version 1.2.1 (size=4096)
+  TCP  10.0.1.1:80 rr
+    -> 192.168.1.2:80               Masq    1      0          0
+    -> 192.168.1.3:80               Masq    1      0          0
+  ```
+
+##### Service Types and Traffic Flow
+
+1. **ClusterIP:**
+  - Internal-only service.
+  - Traffic flow: Client Pod → Service IP (iptables/IPVS) → Backend Pod.
+
+2. **NodePort:**
+  - Extends ClusterIP with node port binding.
+  - Traffic flow: External → Node:Port → Service IP → Backend Pod.
+
+3. **LoadBalancer:**
+  - Extends NodePort with cloud load balancer.
+  - Traffic flow: External → Load Balancer → Node:Port → Service IP → Backend Pod.
+
+##### Debugging Service Networking
+
+**Commands:**
+```sh
+# View iptables rules
+iptables-save | grep -v '^#' | grep KUBE
+
+# View IPVS rules
+ipvsadm -ln
+
+# Check service endpoints
+kubectl get endpoints <service-name>
+
+# View DNS resolution
+kubectl exec -it <pod-name> -- nslookup <service-name>
+
+# Test connectivity
+kubectl exec -it <pod-name> -- curl <service-ip>
+
+# View kube-proxy logs
+kubectl logs -n kube-system <kube-proxy-pod-name>
+```
+
+**Common Issues:**
+- Service has no endpoints (check selectors and pod labels)
+- Incorrect port mappings
+- kube-proxy not running or misconfigured
+- DNS resolution problems
+- Network policy blocking traffic
+
+**Best Practices:**
+- Monitor kube-proxy performance and logs
+- Consider IPVS mode for large clusters
+- Use readiness probes to ensure traffic only goes to healthy pods
+- Document service networking architecture and dependencies
+
+#### DNS in Kubernetes
+
+**DNS (Domain Name System)** is a critical component in Kubernetes that enables service discovery and name resolution within the cluster. Kubernetes uses CoreDNS (default since v1.13) as its DNS server, running as pods in the `kube-system` namespace.
+
+##### DNS Architecture
+
+1. **CoreDNS:**
+  - Runs as a deployment in kube-system namespace
+  - Typically deployed as two pods for redundancy
+  - Configured via a ConfigMap
+  - Watches Services and Pods for DNS record updates
+
+2. **DNS Policy:**
+  Pod's DNS policy can be set via `spec.dnsPolicy`:
+  - `ClusterFirst` (default): Use cluster DNS first
+  - `Default`: Use node's DNS resolution
+  - `ClusterFirstWithHostNet`: For pods using host network
+  - `None`: Allow custom DNS configuration
+
+##### DNS Records
+
+1. **Services:**
+  - `<service-name>.<namespace>.svc.cluster.local`
+  - Example: `mysql.default.svc.cluster.local`
+  - Resolves to cluster IP or headless service pod IPs
+
+2. **Pods:**
+  - `<pod-ip>.<namespace>.pod.cluster.local`
+  - Example: `10-244-2-5.default.pod.cluster.local`
+  - Only created for pods in headless services by default
+
+3. **Headless Services:**
+  - Creates A records for each pod
+  - Example: `pod-name.service-name.namespace.svc.cluster.local`
+
+##### DNS Resolution Order
+
+1. **Within same namespace:**
+  - Just use `service-name`
+  
+2. **Across namespaces:**
+  - Use `service-name.namespace`
+  
+3. **Fully Qualified Domain Name (FQDN):**
+  - Use `service-name.namespace.svc.cluster.local`
+
+##### Example Pod DNS Configuration:
+
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: dns-example
+spec:
+  containers:
+  - name: dns-example
+   image: nginx
+  dnsPolicy: "None"
+  dnsConfig:
+   nameservers:
+    - 1.2.3.4
+   searches:
+    - ns1.svc.cluster.local
+    - my.dns.search.suffix
+   options:
+    - name: ndots
+      value: "2"
+```
+
+##### Debugging DNS:
+
+1. **Check CoreDNS pods:**
+```bash
+kubectl get pods -n kube-system -l k8s-app=kube-dns
+```
+
+2. **View CoreDNS logs:**
+```bash
+kubectl logs -n kube-system -l k8s-app=kube-dns
+```
+
+3. **Test DNS resolution from a pod:**
+```bash
+kubectl run -it --rm debug --image=busybox -- nslookup kubernetes.default
+```
+
+4. **Check DNS configuration:**
+```bash
+kubectl exec -it <pod-name> -- cat /etc/resolv.conf
+```
+
+#### Gateway API
+#### Gateway API
+
+The **Gateway API** is a new standard for Kubernetes service networking that provides a more flexible and extensible way to manage external access to cluster services compared to the traditional Ingress API. It separates concerns between different roles (infrastructure providers, cluster operators, and application developers) and supports more advanced use cases.
+
+##### Key Differences from Ingress
+
+1. **Role Separation:**
+  - Ingress: Single namespaced resource type mixing infrastructure and application concerns. Hard to manage when multiple people are in the picture.
+  - Gateway API: Separate resources for different roles (GatewayClass, Gateway, Routes)
+
+2. **Protocol Support:**
+  - Ingress: HTTP/HTTPS only (officially)
+  - Gateway API: Multi-protocol (HTTP, TCP, UDP, TLS, gRPC)
+
+3. **Feature Set:**
+  - Ingress: Basic HTTP routing with limited customization
+  - Gateway API: Rich features including traffic splitting, header manipulation, weighted routing
+
+4. **Configuration Model:**
+  - Ingress: Heavy reliance on annotations for advanced features, which differ between each controller
+  - Gateway API: Structured and standardized configuration through CRDs
+
+##### Core Resources
+
+1. **GatewayClass:**
+  - Defines a type of gateway implementation
+  - Managed by infrastructure providers
+  - Similar to StorageClass for storage
+  ```yaml
+  apiVersion: gateway.networking.k8s.io/v1
+  kind: GatewayClass
+  metadata:
+    name: example-gc
+  spec:
+    controllerName: example.com/gateway-controller
+  ```
+
+2. **Gateway:**
+  - Represents a load balancer instance
+  - Managed by cluster operators
+  - Defines listeners and their properties
+  ```yaml
+  apiVersion: gateway.networking.k8s.io/v1
+  kind: Gateway
+  metadata:
+    name: example-gateway
+  spec:
+    gatewayClassName: example-gc
+    listeners:
+    - name: http
+     protocol: HTTP
+     port: 80
+  ```
+
+3. **Route Resources:**
+  - Define how traffic should be handled
+  - Managed by application teams
+  - Types include HTTPRoute, TCPRoute, UDPRoute, TLSRoute
+  ```yaml
+  apiVersion: gateway.networking.k8s.io/v1
+  kind: HTTPRoute
+  metadata:
+    name: example-route
+  spec:
+    parentRefs:
+    - name: example-gateway
+    rules:
+    - matches:
+     - path:
+        type: PathPrefix
+        value: /api
+     backendRefs:
+     - name: api-service
+      port: 8080
+  ```
+
+##### Advanced Features
+
+1. **Traffic Splitting:**
+  ```yaml
+  spec:
+    rules:
+    - backendRefs:
+     - name: v1-service
+      port: 80
+      weight: 90
+     - name: v2-service
+      port: 80
+      weight: 10
+  ```
+
+2. **Header Manipulation:**
+  ```yaml
+  spec:
+    rules:
+    - filters:
+     - type: RequestHeaderModifier
+      requestHeaderModifier:
+        add:
+        - name: x-version
+         value: v2
+  ```
+
+3. **Cross-Namespace Routing:**
+  ```yaml
+  spec:
+    rules:
+    - backendRefs:
+     - group: ""
+      kind: Service
+      name: backend
+      namespace: other-ns
+      port: 8080
+  ```
+
+##### Benefits
+
+1. **Extensibility:**
+  - Custom resources can extend the API
+  - Implementations can add features without annotations
+
+2. **Standardization:**
+  - Common interface across different implementations
+  - Reduced vendor lock-in
+
+3. **Security:**
+  - Better role separation
+  - More granular access control
+
+4. **Advanced Features:**
+  - Native support for modern traffic management
+  - Better integration with service mesh
