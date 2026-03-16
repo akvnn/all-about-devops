@@ -97,6 +97,15 @@ _Have fun.. and remember, do not get stuck in tutorial hell :)_
 - [DNS in Kubernetes](#dns-in-kubernetes)
 - [Gateway API](#gateway-api)
 
+9. [CKS](#cks)
+
+- [The 4C's of Cloud Native Security](#the-4cs-of-cloud-native-security)
+- [Cluster Setup and Hardening](#cluster-setup-and-hardening)
+- [System Hardening](#system-hardening)
+- [Minimize Microservice Vulnerabilities](#minimize-microservice-vulnerabilities)
+- [Supply Chain Security](#supply-chain-security)
+- [Monitoring, Logging, and Runtime Security](#monitoring-logging-and-runtime-security)
+
 ### DevOps Overview
 
 #### What is DevOps?
@@ -3824,3 +3833,2693 @@ The **Gateway API** is a new standard for Kubernetes service networking that pro
 4. **Advanced Features:**
   - Native support for modern traffic management
   - Better integration with service mesh
+
+### CKS
+
+#### The 4C's of Cloud Native Security
+
+![4C's of Cloud Native Security](images/four-cs.png)
+1. **Container Security:**
+  - Focuses on securing container images, runtimes, and the container lifecycle.
+  - Key practices include image scanning, using minimal base images, and runtime security tools.
+2. **Cluster Security:**
+  - Involves securing the Kubernetes control plane, nodes, and cluster components.
+  - Key practices include RBAC, network policies, and securing etcd.
+3. **Cloud Security:**
+  - Pertains to securing the underlying cloud infrastructure and services used by Kubernetes.
+  - Key practices include IAM policies, VPC configurations, and cloud provider security features.
+4. **Code Security:**
+  - Focuses on securing the application code running in Kubernetes.
+  - Key practices include static code analysis, dependency scanning, and secure coding practices.
+
+#### Cluster Setup and Hardening
+##### CIS Benchmarks
+
+The **CIS (Center for Internet Security) Kubernetes Benchmark** provides a set of best practices for securing Kubernetes clusters. It covers various aspects of cluster setup and hardening, including:
+- API Server security
+- Controller Manager security
+- Scheduler security
+- etcd security
+- ...
+
+It can be run using tools like `kube-bench` to assess compliance with the benchmark and identify areas for improvement.
+
+##### Configuring ABAC
+**ABAC (Attribute-Based Access Control)** is an authorization mechanism in Kubernetes that uses policies defined in a JSON file to control access to the API server. Each policy specifies attributes of the user, resource, and action to determine whether a request should be allowed or denied.
+Example ABAC policy file (`/etc/kubernetes/abac-policy.jsonl`):
+```jsonl
+{"apiVersion":"abac.authorization.kubernetes.io/v1","kind":"Policy","spec":{"user":"alice","namespace":"default","resource":"pods","apiGroup":"*","nonResourcePath":"*","verb":"*"}}
+{"apiVersion":"abac.authorization.kubernetes.io/v1","kind":"Policy","spec":{"user":"bob","namespace":"testing","resource":"deployments","apiGroup":"apps","nonResourcePath":"*","verb":["get","list"]}}
+```
+
+To enable ABAC, start the kube-apiserver with:
+```
+--authorization-mode=ABAC \
+--authorization-policy-file=/etc/kubernetes/abac-policy.jsonl
+```
+
+**Note:** ABAC is considered difficult to manage at scale due to the need for manual file editing and API server restarts. **RBAC is the recommended authorization method** for most Kubernetes deployments.
+
+##### Kubelet Security
+
+Kubelet config can be configured in - `kubelet-config.yaml` and passed to the kubelet with `--config=/path/to/kubelet-config.yaml`. Key security settings include:
+- `authentication`: Enable client certificate authentication and webhook token authentication.
+- `authorization`: Enable webhook authorization mode to delegate access control decisions to the API server.
+- `tlsCertFile` and `tlsPrivateKeyFile`: Configure TLS for secure communication with the API server.
+- `readOnlyPort`: Disable the read-only port (default 10255) to prevent unauthenticated access.
+- `protectKernelDefaults`: Enable to prevent kubelet from modifying kernel parameters.
+- `evictionHard`: Configure eviction thresholds to protect node stability under resource pressure.
+
+By default, the kubelet listens on port 10250 for secure communication and 10255 for read-only access. It is recommended to disable the read-only port and secure the API port with TLS and authentication.
+
+Additionally, by default, port 10250 has no authentication. Its important to disable anonymous access and enable authentication to secure the kubelet API:
+```yaml
+authentication:
+  anonymous:
+    enabled: false
+```
+
+To enable client certificate authentication:
+```yaml
+authentication:
+  x509:
+    clientCAFile: /etc/kubernetes/pki/ca.crt
+```
+
+By default, authorization mode is `AlwaysAllow`, which allows all requests. It is recommended to switch to `Webhook` mode to delegate authorization decisions to the API server:
+```yaml
+authorization:
+  mode: Webhook
+```
+
+##### Docker Service and Daemon Security
+
+By default, the Docker daemon (`dockerd`) listens on a Unix socket (`/var/run/docker.sock`) for local communication within the same machine. This socket-based communication is restricted to users with appropriate permissions (typically members of the `docker` group), providing a basic level of access control for local connections.
+
+**Local Socket Communication:**
+- Default listening endpoint: `/var/run/docker.sock`
+- Communication method: Unix domain socket
+- Access control: File permissions on the socket (typically `660`, readable/writable by root and docker group members)
+- Security: Inherently secure for local machine access since it's not exposed to the network
+
+**Remote Access Configuration:**
+
+If remote Docker daemon access is required, you can enable TCP ports:
+
+1. **Unencrypted TCP (port 2375):**
+  - Standard HTTP communication
+  - Not secure for untrusted networks
+  - Allows unauthenticated access to Docker API
+  - Configuration: Set `"hosts": ["tcp://0.0.0.0:2375"]` in `/etc/docker/daemon.json`
+
+2. **Encrypted TLS (port 2376):**
+  - HTTPS/TLS-secured communication
+  - Requires certificate and key files
+  - Provides encryption and optional client certificate authentication
+  - Configuration example:
+    ```json
+    {
+     "hosts": ["tcp://0.0.0.0:2376"],
+     "tls": true,
+     "tlscert": "/etc/docker/certs/server-cert.pem",
+     "tlskey": "/etc/docker/certs/server-key.pem",
+     "tlscacert": "/etc/docker/certs/ca.pem"
+    }
+    ```
+However, even with TLS, the Docker API still has no authentication and anyone can access it by setting `DOCKER_TLS=true` (`--tls`).
+To enable authentication, you must use certificates and set `DOCKER_TLS_VERIFY=true` (`--tlsverify`) on the client side, and ensure that only authorized users have access to the client certificates (signed by the CA). You must update the daemon configuration:
+
+```json
+{
+  "hosts": ["tcp://0.0.0.0:2376"],
+  "tlsverify": true,
+  "tlscert": "/etc/docker/certs/server-cert.pem",
+  "tlskey": "/etc/docker/certs/server-key.pem",
+  "tlscacert": "/etc/docker/certs/ca.pem"
+}
+```
+
+Then, clients can access the Docker API securely with:
+
+```bash
+export DOCKER_TLS_VERIFY=true
+export DOCKER_HOST=tcp://<docker-host>:2376
+docker --tlsverify --tlscacert=/path/to/ca.pem --tlscert=/path/to/client-cert.pem --tlskey=/path/to/client-key.pem ps
+```
+
+##### Securing Node Metadata in Kubernetes
+
+Securing node metadata in Kubernetes is crucial to prevent unauthorized access to sensitive information about the cluster and its nodes. Node metadata can include details such as node labels, annotations, and other information that could be exploited by attackers if exposed.
+Strategies include:
+
+1. RBAC
+2. Node Isolation
+3. Network Policies
+4. Audit Logs
+
+#### System Hardening
+
+##### Least Privilege Principle
+
+The principle of least privilege is a security concept that recommends granting users, applications, and processes only the minimum level of access necessary to perform their tasks. 
+
+##### Limiting Node Access
+
+Linux systems store user and group information in several key files:
+
+**1. `/etc/passwd`**
+- Contains user account information (one entry per line)
+- Fields: `username:password-placeholder:UID:GID:gecos:home-directory:shell`
+- Password field typically contains `x` (actual passwords stored in `/etc/shadow`)
+- Example: `alice:x:1000:1000:Alice User:/home/alice:/bin/bash`
+- Readable by all users
+
+**2. `/etc/shadow`**
+- Stores encrypted passwords and password aging information
+- Fields: `username:encrypted-password:last-change:min-age:max-age:warn:inactive:expiration`
+- Readable only by root (permission 600), not world-readable
+- Critical to protect from unauthorized access
+
+**3. `/etc/group`**
+- Contains group information
+- Fields: `group-name:password-placeholder:GID:member-list`
+- Used for managing file permissions and access control
+- Example: `docker:x:999:alice,bob`
+
+**4. `/etc/gshadow`**
+- Stores encrypted group passwords (rarely used)
+- Similar protection to `/etc/shadow` (permission 600)
+
+
+Commands to manage users and groups:
+
+- `who`: Show currently logged-in users
+- `id <username>`: Show user ID and group information
+- `groups <username>`: Show groups a user belongs to
+- `getent passwd <username>`: Get user information from `/etc/passwd`
+- `getent shadow <username>`: Get password information from `/etc/shadow` (requires root)
+- `getent group <groupname>`: Get group information from `/etc/group`
+- `usermod -s /sbin/nologin <username>`: Disable shell access for a user
+- `usermod -L <username>`: Lock a user account
+- `useradd <username>`: Create a new user account
+- `useradd -m <username>`: Create user with home directory
+- `usermod -aG <group> <username>`: Add user to a group
+- `userdel <username>`: Delete a user account
+- `passwd <username>`: Change password for a user
+- `passwd -e <username>`: Force user to change password on next login
+- `passwd -l <username>`: Lock a user account (alternative to `usermod -L`)
+- `passwd -u <username>`: Unlock a user account
+
+##### SSH Configuration for Security
+
+Key SSH security settings in `/etc/ssh/sshd_config`:
+
+- `PermitRootLogin no`: Disable root login via SSH
+- `PasswordAuthentication no`: Disable password auth, use keys only
+- `PubkeyAuthentication yes`: Enable public key authentication
+- `PermitEmptyPasswords no`: Reject empty passwords
+- `X11Forwarding no`: Disable X11 forwarding
+- `MaxAuthTries 3`: Limit authentication attempts
+- `MaxSessions 2`: Limit concurrent sessions
+- `ClientAliveInterval 300`: Timeout idle sessions
+- `AllowUsers user1 user2`: Whitelist allowed users
+- `Port 2222`: Change default port 22 to avoid scanning
+
+Restart SSH after changes: `systemctl restart sshd`
+
+##### /etc/sudoers
+
+**sudoers** file controls which users can run commands with elevated privileges using `sudo`. Located at `/etc/sudoers`, readable only by root (permission 440).
+
+**Edit safely using:**
+```bash
+visudo  # Use this—prevents syntax errors and file locks
+```
+
+**Basic syntax:**
+```
+user HOST=(runas-user:runas-group) COMMAND
+```
+
+**Examples:**
+```
+alice ALL=(ALL) ALL                          # alice can run any command anywhere
+bob ALL=(root) /usr/bin/apt-get              # bob can run apt-get as root only
+%wheel ALL=(ALL) NOPASSWD: ALL               # wheel group, no password prompt
+```
+
+**Key concepts:**
+- `%groupname`: Apply rule to group
+- `NOPASSWD`: Skip password prompt
+- `ALL`: No restrictions on that field
+- `(user:group)`: Specify target user/group for command execution
+
+**Dangerous settings to avoid:**
+- `ALL=(ALL) ALL` with `NOPASSWD`: Unrestricted privilege escalation
+
+##### Restricting Kernel Modules
+
+Kernel modules extend kernel functionality at runtime. Restricting or disabling unnecessary modules reduces the attack surface and prevents unauthorized privilege escalation.
+
+**1. Viewing Loaded Modules:**
+```bash
+lsmod                          # List all loaded modules
+lsmod | grep <module-name>    # Check if specific module is loaded
+modinfo <module-name>         # Show module information
+```
+
+**2. Unloading Modules:**
+```bash
+modprobe -r <module-name>     # Remove a loaded module
+rmmod <module-name>           # Alternative removal command
+```
+
+**3. Blacklisting Modules (Prevent Loading):**
+
+Edit `/etc/modprobe.d/blacklist.conf`:
+```bash
+# Disable USB storage module
+blacklist usb_storage
+
+# Disable uncommon network modules
+blacklist dccp
+blacklist sctp
+blacklist rds
+blacklist tipc
+```
+
+Or create a custom file:
+```bash
+echo "blacklist usbcore" >> /etc/modprobe.d/disable-usb.conf
+```
+
+Then regenerate the initramfs to apply changes:
+```bash
+update-initramfs -u          # Ubuntu/Debian
+dracut -f                     # RHEL/CentOS/Fedora
+```
+
+**4. Disabling Uncommon Network Protocols:**
+
+```bash
+echo "install dccp /bin/true" >> /etc/modprobe.d/dccp.conf
+echo "install sctp /bin/true" >> /etc/modprobe.d/sctp.conf
+echo "install rds /bin/true" >> /etc/modprobe.d/rds.conf
+echo "install tipc /bin/true" >> /etc/modprobe.d/tipc.conf
+```
+
+The `/bin/true` command prevents the module from loading.
+
+**5. Disabling USB and Uncommon Storage:**
+
+```bash
+echo "install usb-storage /bin/true" >> /etc/modprobe.d/usb-storage.conf
+echo "install usbcore /bin/true" >> /etc/modprobe.d/usb.conf
+```
+
+**6. Verifying Restrictions:**
+
+```bash
+grep -r "blacklist\|install.*\/bin\/true" /etc/modprobe.d/
+```
+
+**7. Common Modules to Restrict:**
+
+- `dccp`: Datagram Congestion Control Protocol (rarely needed)
+- `sctp`: Stream Control Transmission Protocol (rarely needed)
+- `rds`: Reliable Datagram Sockets (rarely needed)
+- `tipc`: Transparent Inter-Process Communication (rarely needed)
+- `usb-storage`: USB mass storage (if USB devices not required)
+- `bluetooth`: If wireless/Bluetooth not used
+- `wifi`: If only wired connectivity needed
+
+**8. Check Which Modules Are Currently Loaded:**
+
+```bash
+cat /proc/modules | wc -l     # Count total loaded modules
+lsmod | head -20              # Show first 20 modules
+```
+
+
+##### systemctl Commands
+
+**systemctl** is the primary command for managing systemd services on modern Linux systems. It controls service startup, stopping, enabling, and monitoring.
+
+**Basic Service Management:**
+
+- `systemctl start <service>`: Start a service immediately
+- `systemctl stop <service>`: Stop a running service
+- `systemctl restart <service>`: Stop and restart a service
+- `systemctl reload <service>`: Reload service configuration without fully restarting
+- `systemctl status <service>`: Show current service status and recent logs
+- `systemctl is-active <service>`: Check if service is currently running (returns active/inactive)
+- `systemctl is-enabled <service>`: Check if service auto-starts on boot (returns enabled/disabled)
+
+**Enabling and Disabling Services:**
+
+- `systemctl enable <service>`: Enable service to auto-start on boot
+- `systemctl disable <service>`: Disable auto-start on boot
+- `systemctl enable --now <service>`: Enable and immediately start service
+- `systemctl disable --now <service>`: Disable and immediately stop service
+
+**Viewing Service Information:**
+
+- `systemctl list-units --type=service`: List all services
+- `systemctl list-units --type=service --state=running`: List only running services
+- `systemctl list-units --type=service --state=failed`: List failed services
+- `systemctl cat <service>`: Show service unit file contents
+- `systemctl show <service>`: Display all service properties and settings
+- `systemctl show -p <property> <service>`: Show specific property of a service
+- `systemctl list-dependencies <service>`: Show service dependencies
+
+**Logging and Diagnostics:**
+
+- `journalctl -u <service>`: View service logs
+- `journalctl -u <service> -n 50`: View last 50 log lines
+- `journalctl -u <service> -f`: Follow service logs in real-time
+- `journalctl -u <service> --since "1 hour ago"`: View logs from last hour
+- `systemctl reset-failed <service>`: Clear failed state of a service
+
+**System State Management:**
+
+- `systemctl reboot`: Reboot the system
+- `systemctl poweroff`: Shut down the system
+- `systemctl suspend`: Suspend the system (sleep mode)
+- `systemctl hibernate`: Hibernate the system
+- `systemctl isolate multi-user.target`: Switch to multi-user mode (terminal)
+- `systemctl isolate graphical.target`: Switch to graphical mode (GUI)
+
+**Service Unit Files:**
+
+Service unit files are typically located in:
+- `/etc/systemd/system/`: Custom user-created services
+- `/usr/lib/systemd/system/`: System package services
+- `/run/systemd/system/`: Runtime-generated services
+
+**Find service using a specific port:**
+
+```bash
+cat /etc/services | grep <port-number>
+```
+
+##### UFW (Uncomplicated Firewall)
+
+**UFW** is a simplified firewall management tool for Linux that provides an easy-to-use interface for managing iptables rules. It abstracts the complexity of iptables and provides intuitive commands for allowing or denying traffic.
+
+**Enabling and Disabling UFW:**
+
+- `ufw enable`: Enable the firewall and start enforcing rules
+- `ufw disable`: Disable the firewall (removes all rules from active enforcement)
+- `ufw status`: Show current firewall status and active rules
+- `ufw status verbose`: Show detailed status with rule numbers and logging
+- `ufw status numbered`: Show rules with line numbers for easy reference
+
+**Basic Rules - Allow and Deny:**
+
+- `ufw allow 22`: Allow SSH connections (port 22)
+- `ufw allow 80/tcp`: Allow HTTP traffic on port 80 (TCP only)
+- `ufw allow 443/udp`: Allow traffic on port 443 (UDP only)
+- `ufw allow ssh`: Allow SSH by service name (looks up in `/etc/services`)
+- `ufw allow http`: Allow HTTP by service name
+- `ufw allow https`: Allow HTTPS by service name
+- `ufw deny 23`: Deny Telnet connections (port 23)
+- `ufw deny from 192.168.1.100`: Deny all traffic from specific IP address
+- `ufw allow from 10.0.0.0/8`: Allow all traffic from specific subnet
+- `ufw allow from 192.168.1.100 to any port 22`: Allow specific IP to access port 22 only
+
+**Managing Rules:**
+
+- `ufw delete allow 80`: Delete a rule (remove allow on port 80)
+- `ufw delete deny 23`: Delete a deny rule
+- `ufw delete allow from 192.168.1.100`: Delete rule for specific IP
+- `ufw reset`: Reset firewall to default state (removes all rules)
+- `ufw reload`: Reload firewall rules without losing current state
+
+**Advanced Rule Management:**
+
+- `ufw default allow incoming`: Set default policy to allow incoming traffic
+- `ufw default deny incoming`: Set default policy to deny incoming traffic (recommended)
+- `ufw default allow outgoing`: Set default policy to allow outgoing traffic
+- `ufw default deny outgoing`: Set default policy to deny outgoing traffic
+- `ufw insert 1 allow 22`: Insert rule at line 1 (highest priority)
+
+**Logging:**
+
+- `ufw logging on`: Enable firewall logging
+- `ufw logging off`: Disable firewall logging
+- `ufw logging high`: Set logging level to high (maximum verbosity)
+- `ufw logging medium`: Set logging level to medium
+- `ufw logging low`: Set logging level to low (minimal verbosity)
+- `journalctl -u ufw`: View UFW logs from systemd journal
+
+**Rule Syntax Examples:**
+
+```bash
+# Allow specific port with protocol
+ufw allow 3306/tcp                              # MySQL over TCP
+
+# Allow service by name
+ufw allow Samba                                 # Allow Samba service
+
+# Allow from specific IP to specific port
+ufw allow from 192.168.1.50 to any port 3306   # MySQL from specific IP
+
+# Allow IP range
+ufw allow from 10.0.0.0/8                       # Allow entire subnet
+
+# Allow with direction
+ufw allow in on eth0 to any port 80             # Allow on specific interface
+
+# Deny rules
+ufw deny in on eth0 from 192.168.1.100         # Deny from IP on interface eth0
+```
+
+**Common Firewall Configurations:**
+
+**1. Default Deny Incoming (Recommended for Servers):**
+```bash
+ufw default deny incoming
+ufw default allow outgoing
+ufw allow 22/tcp                   # SSH
+ufw allow 80/tcp                   # HTTP
+ufw allow 443/tcp                  # HTTPS
+ufw enable
+```
+
+**2. Allow Kubernetes API Server:**
+```bash
+ufw allow 6443/tcp                 # Kubernetes API Server
+ufw allow 10250/tcp                # Kubelet
+```
+
+**3. Allow Docker Daemon (if needed):**
+```bash
+ufw allow 2375/tcp                 # Docker (insecure)
+ufw allow 2376/tcp                 # Docker (secure with TLS)
+```
+
+**4. Allow etcd (cluster communication):**
+```bash
+ufw allow 2379/tcp                 # etcd client API
+ufw allow 2380/tcp                 # etcd peer communication
+```
+
+**Troubleshooting:**
+
+- `ufw show added`: Show rules that have been added
+- `ufw show raw`: Show raw iptables rules generated by UFW
+- `ufw show builtins`: Show built-in chains
+- `systemctl status ufw`: Check if UFW service is running
+- `systemctl restart ufw`: Restart UFW service
+
+**Important Notes:**
+
+- UFW must be explicitly enabled; it doesn't enforce rules until activated with `ufw enable`
+- Default policies should be `deny incoming` and `allow outgoing` for security
+- UFW rules persist across reboots after `ufw enable`
+- Misconfiguring SSH rules (like denying port 22) while SSH is in use can lock you out if UFW is remote—always test carefully
+- UFW is available on Ubuntu/Debian; other distributions may use `firewalld` or direct `iptables`
+
+##### System Calls (syscalls)
+
+**System calls (syscalls)** are the interface between user-space applications and the kernel. They allow processes to request services from the operating system, such as file I/O, process management, memory allocation, network communication, and other privileged operations that only the kernel can perform.
+
+**Why System Calls?**
+
+- User-space applications cannot directly execute privileged operations (e.g., reading from disk, accessing network) for security and stability reasons.
+- System calls provide a controlled interface for applications to request kernel services.
+- The kernel validates and enforces security policies before performing the requested operation.
+
+**How System Calls Work:**
+
+1. **User Process Issues Request:**
+  - Application calls a syscall function (e.g., `read()`, `write()`, `fork()`).
+
+2. **Context Switch:**
+  - CPU switches from user mode to kernel mode (privileged mode).
+  - The application passes syscall arguments (syscall number and parameters).
+
+3. **Kernel Processes Request:**
+  - Kernel validates the request and checks permissions.
+  - Kernel performs the requested operation.
+
+4. **Return to User Mode:**
+  - Kernel returns the result to the application.
+  - CPU switches back to user mode.
+
+This mode switching incurs performance overhead, so frequent syscalls can impact application performance.
+
+**Common System Calls:**
+
+**File Operations:**
+- `open()`: Open a file descriptor
+- `close()`: Close a file descriptor
+- `read()`: Read from a file
+- `write()`: Write to a file
+- `lseek()`: Seek within a file
+- `stat()`: Get file metadata
+- `chmod()`: Change file permissions
+- `chown()`: Change file owner
+
+**Process Management:**
+- `fork()`: Create a new process
+- `exec()`: Execute a new program
+- `exit()`: Terminate a process
+- `wait()`: Wait for child process
+- `getpid()`: Get process ID
+- `getppid()`: Get parent process ID
+- `kill()`: Send signal to process
+
+**Memory Management:**
+- `brk()`: Adjust heap size
+- `mmap()`: Map memory regions
+- `munmap()`: Unmap memory regions
+- `mprotect()`: Change memory protection
+
+**Network:**
+- `socket()`: Create a socket
+- `bind()`: Bind socket to address
+- `listen()`: Listen for connections
+- `accept()`: Accept connections
+- `connect()`: Connect to remote address
+- `send()`: Send data
+- `recv()`: Receive data
+
+**Signals:**
+- `signal()`: Register signal handler
+- `sigaction()`: Advanced signal handling
+- `kill()`: Send signal to process
+- `pause()`: Wait for signal
+
+**Capabilities and Permissions:**
+- `setuid()`: Change user ID
+- `setgid()`: Change group ID
+- `getuid()`: Get user ID
+- `getgid()`: Get group ID
+- `capset()`: Set process capabilities
+- `capget()`: Get process capabilities
+
+**System Calls and Kubernetes Security:**
+
+In Kubernetes, securing system calls is important for preventing privilege escalation and container escape attacks. Mechanisms include:
+
+1. **seccomp (Secure Computing Mode):**
+  - Restricts the set of syscalls a container can make.
+  - Can be applied at the container level in pod specs.
+  - Example: Block `exec`, `fork`, or other dangerous syscalls.
+  - Seccomp has 3 modes: 0 (disabled), 1 (strict), 2 (filtering with custom profiles). You can identify the mode on a process by:
+    ```bash
+    cat /proc/1/status | grep Seccomp
+    ```
+  - In docker, you can specify seccomp profiles with `--security-opt seccomp=profile.json` when running a container. The default Docker seccomp profile blocks around 64 syscalls that are considered dangerous for containerized applications, such as `ptrace`, `process_vm_readv`, and `process_vm_writev`. This helps prevent container escape and privilege escalation attacks by restricting access to critical kernel features. Some syscals are not allowed even when running unconfined seccomp profile. This is prevented by other security mechanisms.
+  - K8s does not implement sseccomp by default. It only blocks around 21 syscalls by default. You can enable it by setting `seccompProfile` in the pod spec. If you want to block more syscalls, you can create a custom seccomp profile and specify it in the pod spec.
+2. **AppArmor:**
+  - Linux security module that restricts syscalls and file access.
+  - Applied via pod annotations or node configuration.
+
+3. **SELinux:**
+  - Alternative security module providing mandatory access control.
+  - Restricts what syscalls processes can execute based on security policies.
+
+4. **Pod Security Standards:**
+  - Restrict privileged syscalls like `SYS_PTRACE`, `SYS_MODULE`, etc.
+  - Prevent containers from calling dangerous syscalls.
+
+**Seccomp Profile Types:**
+
+- `RuntimeDefault`: Use the default seccomp profile provided by the container runtime (e.g., Docker's default profile).
+- `Localhost`: Use a custom seccomp profile stored on the node (e.g., `my-profile.json`).
+
+**Example: seccomp Profile in Kubernetes Pod:**
+
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: seccomp-example
+spec:
+  securityContext:
+    seccompProfile:
+      type: RuntimeDefault               # Use default seccomp profile. Blocks around 64 syscalls by default.
+      # OR
+      # type: Localhost
+      # localhostProfile: my-profile.json
+  containers:
+  - name: app
+    image: nginx
+    securityContext:
+      allowPrivilegeEscalation: false
+      capabilities:
+        drop: ["ALL"]
+```
+
+**Common Syscall Blocks:**
+
+To restrict dangerous syscalls in seccomp profiles:
+```json
+{
+  "defaultAction": "SCMP_ACT_ALLOW",
+  "defaultErrnoRet": 1,
+  "archMap": [
+    {
+      "architecture": "SCMP_ARCH_X86_64",
+      "subArchitectures": ["SCMP_ARCH_X86", "SCMP_ARCH_X32"]
+    }
+  ],
+  "syscalls": [
+    {
+      "names": ["ptrace", "process_vm_readv", "process_vm_writev"],
+      "action": "SCMP_ACT_ERRNO"
+    }
+  ]
+}
+```
+
+**Auditing System Calls:**
+
+Kernel provides audit logs of syscalls when configured:
+
+```bash
+# Enable audit
+auditctl -w /etc/shadow -p wa -k shadow-modifications
+
+# View audit logs
+ausearch -k shadow-modifications
+```
+
+**Performance Considerations:**
+
+- Each syscall involves context switching, which is expensive.
+- Applications making frequent syscalls may have performance bottlenecks.
+- Optimize by batching I/O operations or using asynchronous syscalls.
+- Use tools like `strace` to profile syscall usage.
+
+**Viewing Syscalls with strace:**
+
+```bash
+# Trace all syscalls of a process
+strace -o output.txt ./my-application
+
+# Count syscalls by type
+strace -c ./my-application
+
+# Filter specific syscalls
+strace -e trace=open,read,write ./my-application
+
+# Trace container syscalls (requires privileged access)
+kubectl debug -it <pod-name> -- strace -e trace=syscall <command>
+```
+
+##### AppArmor
+
+**AppArmor** is a Linux security module (LSM) that provides mandatory access control (MAC) by restricting what system calls and resources a process can access. It works by confining programs to a limited set of resources based on security profiles, helping prevent privilege escalation and unauthorized access to sensitive files and resources.
+
+**How AppArmor Works:**
+
+- **Profiles:** Security policies defined for specific applications or processes.
+- **Modes:**
+  - `enforce`: Violations are denied and logged.
+  - `complain`: Violations are allowed but logged (useful for development).
+  - `unconfined`: No restrictions, process runs without confinement.
+  - `disabled`: Profile is not active.
+- **Confinement:** Restricts file access, network access, and capability usage based on profile rules.
+
+**AppArmor vs SELinux:**
+
+| Feature | AppArmor | SELinux |
+|---------|----------|--------|
+| Complexity | Simpler, path-based rules | More complex, label-based |
+| Learning Curve | Easier to learn and configure | Steeper learning curve |
+| Distribution | Ubuntu, Debian (default) | RHEL, CentOS, Fedora (default) |
+| Performance | Lower overhead | Slightly higher overhead |
+| Flexibility | Good for basic containment | More granular control |
+
+**Common AppArmor Commands:**
+
+- `apparmor_status`: Show status of AppArmor and loaded profiles
+- `apparmor_parser -r /etc/apparmor.d/profile-name`: Load/reload a profile
+- `apparmor_parser -R /etc/apparmor.d/profile-name`: Remove a profile
+- `aa-enforce /etc/apparmor.d/profile-name`: Set profile to enforce mode
+- `aa-complain /etc/apparmor.d/profile-name`: Set profile to complain mode
+- `aa-disable /etc/apparmor.d/profile-name`: Disable a profile
+- `aa-genprof /path/to/application`: Generate a profile interactively
+- `aa-logprof`: Update profiles based on audit logs
+- `aa-audit /etc/apparmor.d/profile-name`: Enable audit logging for a profile
+- `aa-status`: Check which profiles are loaded and their modes
+
+**AppArmor Profile Structure:**
+
+A basic AppArmor profile (`/etc/apparmor.d/profile-name`):
+
+```apparmor
+#include <tunables/global>
+
+profile my-app /usr/bin/my-app {
+  #include <abstractions/base>
+  
+  # Allow read and write to specific files
+  /etc/my-app.conf r,
+  /var/log/my-app.log w,
+  /tmp/** rw,
+  
+  # Allow executing specific binaries
+  /usr/bin/sh rix,
+  
+  # Deny access to sensitive files
+  deny /etc/shadow rwk,
+  deny /root/** rwx,
+  
+  # Allow specific capabilities
+  capability setuid,
+  capability net_bind_service,
+  
+  # Deny dangerous capabilities
+  deny capability sys_ptrace,
+  deny capability sys_module,
+}
+```
+
+**AppArmor Utils:**
+- `aa-genprof`: Generate a profile interactively by running the application and logging violations.
+- `aa-logprof`: Update profiles based on logged violations, allowing you to refine rules over time.
+
+**AppArmor in Kubernetes:**
+
+AppArmor can be applied to pods via annotations. The kubelet enforces AppArmor profiles on container processes.
+
+**Example Pod with AppArmor:**
+
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: apparmor-example
+  # annotations:
+    # container.apparmor.security.beta.kubernetes.io/my-container: localhost/my-app
+spec:
+  securityContext:
+    appArmorProfile:
+      type: Localhost
+      localhostProfile: my-app
+  containers:
+  - name: my-container
+    image: my-app:latest
+    securityContext:
+      runAsNonRoot: true
+      runAsUser: 1000
+      allowPrivilegeEscalation: false
+```
+
+**Important Notes:**
+
+- AppArmor must be enabled on the node; check with `aa-status` or `systemctl status apparmor`.
+- ApppArmor kernel module must be loaded on the nodes. You can check if its loaded with `cat /sys/module/apparmor/parameters/enabled` (should return `Y`) and the profile should also be loaded (check with `cat /sys/kernel/security/apparmor/profiles`).
+- Kubernetes AppArmor support is in beta; profiles must be pre-installed on nodes at `/etc/apparmor.d/`.
+- Use `localhost/profile-name` format to reference node-local profiles.
+- Without a matching profile, the pod will fail to start if AppArmor annotation is specified.
+- AppArmor profiles should be carefully designed to avoid overly restrictive or permissive access.
+
+**Debugging AppArmor:**
+
+- Check AppArmor audit logs: `journalctl -xe | grep apparmor`
+- Use complain mode to see violations without blocking: `aa-complain /etc/apparmor.d/profile-name`
+- Generate profiles interactively: `aa-genprof /path/to/application`
+- Review logs and update profiles: `aa-logprof`
+
+
+##### Linux Capabilities
+
+**Linux Capabilities** are a security feature that divide the privileges of the root user into distinct units called capabilities. Instead of granting a process all root privileges (UID 0), you can grant it only the specific capabilities it needs to function, adhering to the principle of least privilege.
+
+Capabilities reduce the attack surface by limiting what a process can do even if it's compromised. Rather than running a service as root with unrestricted access, you can run it as a non-root user with only the necessary capabilities.
+
+**Why Capabilities Matter:**
+
+- **Privilege Separation:** Divides root privileges into granular units.
+- **Least Privilege:** Processes get only the capabilities they need.
+- **Security:** Reduces impact of compromise; a compromised process with limited capabilities can do less damage.
+- **Container Security:** Essential for Kubernetes and Docker security hardening.
+
+**Capability Categories:**
+
+Linux capabilities are grouped by when they apply:
+
+- **Permitted (P):** Capabilities the process is allowed to use.
+- **Inheritable (I):** Capabilities that child processes can inherit.
+- **Effective (E):** Capabilities currently active for the process.
+- **Ambient (A):** Capabilities automatically granted to child processes (Linux 4.3+).
+- **Bounding Set (B):** Maximum capabilities a process can ever obtain.
+
+**Common Linux Capabilities:**
+
+| Capability | Description |
+|-----------|-------------|
+| `CAP_CHOWN` | Change file ownership |
+| `CAP_DAC_OVERRIDE` | Bypass file permission checks |
+| `CAP_DAC_READ_SEARCH` | Bypass file read and directory search checks |
+| `CAP_FOWNER` | Bypass permission checks on file operations |
+| `CAP_SETGID` | Set group ID (`setgid()`) |
+| `CAP_SETUID` | Set user ID (`setuid()`) |
+| `CAP_SETFCAP` | Set file capabilities |
+| `CAP_NET_BIND_SERVICE` | Bind to ports < 1024 (HTTP, HTTPS, DNS) |
+| `CAP_NET_RAW` | Use raw sockets |
+| `CAP_NET_ADMIN` | Network administration |
+| `CAP_SYS_CHROOT` | Change root directory |
+| `CAP_SYS_PTRACE` | Trace processes (`ptrace()`) |
+| `CAP_SYS_ADMIN` | Broad admin capabilities (avoid if possible) |
+| `CAP_SYS_MODULE` | Load/unload kernel modules |
+| `CAP_SYS_BOOT` | Reboot the system |
+| `CAP_KILL` | Send signals to processes |
+| `CAP_IPC_LOCK` | Lock memory (prevent swapping) |
+| `CAP_MAC_ADMIN` | MAC (Mandatory Access Control) administration |
+| `CAP_MAC_OVERRIDE` | Override MAC policies |
+
+**Viewing Capabilities:**
+
+```bash
+# View capabilities of a running process
+getcap /path/to/binary                    # View capabilities of a binary
+getpcaps <PID>                            # View capabilities of a running process
+
+# View all capabilities on a system
+grep Cap /proc/<PID>/status               # View process capabilities
+
+# List all available capabilities
+man capabilities                           # Read capabilities man page
+```
+
+**Setting Capabilities:**
+
+```bash
+# Add capabilities to a binary
+setcap cap_net_bind_service=ep /usr/bin/my-app    # Allow binding to port < 1024
+
+# Multiple capabilities
+setcap cap_net_bind_service,cap_setuid=ep /usr/bin/my-app
+
+# Remove capabilities
+setcap -r /usr/bin/my-app
+
+# View capabilities of a binary
+getcap /usr/bin/my-app
+```
+
+**Capability Notation:**
+
+- `e` (effective): The capability is active.
+- `p` (permitted): The capability can be used.
+- `i` (inheritable): Child processes inherit the capability.
+- `+` (add): Add the capability.
+- `-` (remove): Remove the capability.
+
+**Examples:**
+
+```bash
+setcap cap_net_bind_service=ep /usr/bin/nginx     # ep = effective and permitted
+setcap cap_sys_ptrace+ep /usr/bin/debugger        # Allow process tracing
+setcap cap_ipc_lock=ep /usr/bin/memory-app        # Allow memory locking
+```
+
+**Capabilities in Docker:**
+
+By default, Docker drops many dangerous capabilities and keeps a minimal set:
+
+```bash
+# Default capabilities kept by Docker
+CAP_CHOWN, CAP_DAC_OVERRIDE, CAP_SETFCAP, CAP_SETGID, CAP_SETUID, 
+CAP_SETFCAP, CAP_NET_RAW, CAP_SYS_CHROOT, CAP_KILL, CAP_NET_BIND_SERVICE
+```
+
+Add or drop capabilities with Docker:
+
+```bash
+# Drop all capabilities, then add back specific ones (recommended)
+docker run --cap-drop=ALL --cap-add=NET_BIND_SERVICE my-image
+
+# Add a capability
+docker run --cap-add=SYS_ADMIN my-image
+
+# Drop a capability
+docker run --cap-drop=NET_RAW my-image
+
+# Run privileged (dangerous—keeps all capabilities)
+docker run --privileged my-image
+```
+
+**Capabilities in Kubernetes:**
+
+By default, Kubernetes (and Docker) only allows a minimal set of capabilities and drops many by default. You can manage capabilities at the pod or container level using `securityContext`:
+
+**Example: Drop All Capabilities, Add Only Needed Ones:**
+
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: capability-example
+spec:
+  containers:
+  - name: app
+    image: my-app:latest
+    securityContext:
+      capabilities:
+        drop:
+          - ALL                         # Drop all capabilities
+        add:
+          - NET_BIND_SERVICE            # Add only needed capability
+      runAsNonRoot: true
+      runAsUser: 1000
+      allowPrivilegeEscalation: false
+```
+
+#### Minimize Microservice Vulnerabilities
+
+##### Pod Security Standards and Pod Security Admission
+
+**Pod Security Standards (PSS)** is a Kubernetes standard that defines three security profiles (restricted, baseline, and privileged) for pod configurations. These standards specify which security features and behaviors are allowed or restricted for pods running in the cluster.
+
+**Pod Security Admission (PSA)** is the enforcement mechanism that implements Pod Security Standards. It's a built-in admission controller that validates pods against the defined security standards and can enforce, audit, or warn based on violations.
+
+**Three Pod Security Standards Levels:**
+
+1. **Privileged:**
+  - Unrestricted policy; allows the widest range of pod specifications.
+  - No restrictions on dangerous features like privileged containers, host access, etc.
+  - Useful for system-level pods and cluster infrastructure.
+  - Not recommended for user workloads.
+  - Key allowed features:
+    - Privileged containers
+    - Access to host namespaces (network, PID, IPC)
+    - Host port binding
+    - Unsafe syscalls
+    - SELinux policy override
+
+2. **Baseline:**
+  - Minimal restrictions; prevents known privilege escalation vectors.
+  - Allows most pod features but blocks the most dangerous ones.
+  - Good balance for general-purpose workloads.
+  - Allows:
+    - Non-privileged containers
+    - Host port binding (but not privileged ports < 1024 for non-root)
+    - Unsafe syscalls (most)
+  - Denies:
+    - Privileged containers
+    - Privilege escalation via `allowPrivilegeEscalation: true`
+    - Access to host namespaces (network, PID, IPC)
+    - Host path mounts (except read-only)
+    - Dangerous capabilities (e.g., `SYS_ADMIN`, `NET_ADMIN`)
+
+3. **Restricted:**
+  - Heavily restricted policy; enforces current security best practices.
+  - Most stringent standard; suitable for sensitive workloads.
+  - Requires explicit opt-in for most features.
+  - Enforces:
+    - Non-root user required
+    - Read-only root filesystem
+    - No privilege escalation
+    - Dropped dangerous capabilities
+    - Resource limits required
+    - No host access
+    - Restricted volumes (only projected, configMap, downwardAPI, emptyDir, secret)
+    - SELinux restrictions
+    - No unsafe syscalls (tight seccomp profile)
+
+**Pod Security Admission Modes:**
+
+Pod Security Admission operates in three modes per namespace:
+
+1. **enforce:**
+  - Violations result in pod rejection.
+  - Pod will not be created if it violates the standard.
+  - Used for production namespaces.
+
+2. **audit:**
+  - Violations are logged but pods are allowed.
+  - Violations appear in audit logs and Kubernetes events.
+  - Useful for identifying non-compliant workloads without blocking them.
+
+3. **warn:**
+  - Violations trigger a warning in the API response but pods are allowed.
+  - Users see warnings when creating/updating pods.
+  - Helpful for development and gradual migration.
+
+**Configuring Pod Security Standards:**
+
+Pod Security Standards are applied via labels on namespaces. The label format is:
+
+```
+pod-security.kubernetes.io/<mode>: <level>
+```
+
+Where `<mode>` is one of `enforce`, `audit`, or `warn`, and `<level>` is one of `privileged`, `baseline`, or `restricted`.
+
+**Example: Apply Restricted PSS to a Namespace:**
+
+```bash
+# Label namespace with restricted enforcement
+kubectl label namespace my-app pod-security.kubernetes.io/enforce=restricted
+
+# Also apply audit and warn for visibility
+kubectl label namespace my-app \
+  pod-security.kubernetes.io/enforce=restricted \
+  pod-security.kubernetes.io/audit=restricted \
+  pod-security.kubernetes.io/warn=restricted
+```
+
+**Namespace YAML with Pod Security Standards:**
+
+```yaml
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: secure-ns
+  labels:
+    pod-security.kubernetes.io/enforce: restricted       # Enforce policy
+    pod-security.kubernetes.io/enforce-version: latest   # Use latest standard version
+    pod-security.kubernetes.io/audit: restricted         # Audit violations
+    pod-security.kubernetes.io/warn: restricted          # Warn on violations
+```
+
+**Version Control:**
+
+You can also specify which version of the Pod Security Standard to use:
+
+```bash
+pod-security.kubernetes.io/enforce-version: v1.27
+```
+
+**Exemptions and Exceptions:**
+
+You can exempt specific pods, users, or runtimes from Pod Security Standards by configuring the Pod Security Admission controller.
+
+Example configuration in `/etc/kubernetes/manifests/kube-apiserver.yaml`:
+
+```yaml
+- --admission-control-config-file=/etc/kubernetes/psa-config.yaml
+```
+
+PSA config file `/etc/kubernetes/psa-config.yaml`:
+
+```yaml
+apiVersion: apiserver.config.k8s.io/v1
+kind: AdmissionConfiguration
+plugins:
+  - name: PodSecurity
+    configuration:
+      apiVersion: pod-security.admission.config.k8s.io/v1beta1
+      kind: PodSecurityAdmissionConfiguration
+      defaults:
+        enforce: "baseline"
+        audit: "restricted"
+        warn: "restricted"
+      exemptions:
+        namespaces: ["kube-system", "kube-public"]
+        runtimeClassNames: ["gvisor"]
+        usernames: ["system:admin"]
+```
+
+**Deprecated: Pod Security Policy (PSP)**
+
+Pod Security Policy (PSP) was the previous mechanism for enforcing pod security standards but is now deprecated as of Kubernetes 1.25 and removed in 1.29. Pod Security Admission (PSA) is the recommended replacement.
+
+##### OPA (Open Policy Agent)
+
+**OPA (Open Policy Agent)** is a general-purpose policy engine that enables decoupled policy decision-making across various systems and applications (e.g., authorization of applications). It provides a unified way to define, manage, and enforce policies as code using a domain-specific language called **Rego**.
+
+**Why OPA?**
+
+- **Centralized Policy Management:** Define security and compliance policies in one place.
+- **Decoupled Policies:** Policies are independent of application logic.
+- **Fine-Grained Control:** Enforce policies at multiple levels (API gateway, service mesh, CI/CD, cloud infrastructure).
+- **Audit and Compliance:** Track policy violations and maintain compliance records.
+- **Flexibility:** Works with Kubernetes, microservices, APIs, cloud providers, and more.
+
+**How OPA Works:**
+
+1. **Policy Definition:** Write policies in Rego (OPA's query language).
+2. **Input Data:** Pass data and context to OPA for evaluation.
+3. **Policy Evaluation:** OPA evaluates the input against policies.
+4. **Decision Output:** OPA returns a decision (allow/deny) and reasons.
+5. **Action:** The calling system acts on the decision (enforce, log, alert).
+
+**Rego Language Basics:**
+
+Rego is a declarative query language designed for policy and data transformations. Key concepts:
+
+- **Rules:** Logical statements that define policy conditions.
+- **Packages:** Organize rules and policies.
+- **Imports:** Reference other packages and modules.
+- **Variables:** Wildcards and logical variables for pattern matching.
+
+**Example Rego Policy:**
+
+```rego
+package kubernetes.admission
+
+# Deny privileged containers
+deny[msg] {
+  input.request.object.spec.containers[_].securityContext.privileged == true
+  msg := "Privileged containers are not allowed"
+}
+
+# Deny images from untrusted registries
+deny[msg] {
+  image := input.request.object.spec.containers[_].image
+  not startswith(image, "gcr.io/")
+  not startswith(image, "docker.io/library/")
+  msg := sprintf("Image from untrusted registry: %v", [image])
+}
+
+# Require resource limits
+deny[msg] {
+  container := input.request.object.spec.containers[_]
+  not container.resources.limits
+  msg := sprintf("Container %v must have resource limits", [container.name])
+}
+```
+
+**OPA in Kubernetes (Gatekeeper):**
+
+**Gatekeeper** is a Kubernetes-specific OPA implementation that acts as a ValidatingWebhook or MutatingWebhook admission controller. It enforces policies at the API server level before pods are created or updated.
+
+**Installing Gatekeeper:**
+
+```bash
+# Using Helm
+helm repo add gatekeeper https://open-policy-agent.github.io/gatekeeper/charts
+helm install gatekeeper/gatekeeper --namespace gatekeeper-system --create-namespace
+
+# Or using kubectl
+kubectl apply -f https://raw.githubusercontent.com/open-policy-agent/gatekeeper/master/deploy/gatekeeper.yaml
+```
+
+**Gatekeeper Components:**
+
+1. **Constraint Templates:** Define the structure of policy constraints (CRDs).
+2. **Constraints:** Instances of constraint templates with specific parameters.
+3. **Audit:** Tracks violations of existing resources.
+
+**Example: Creating a Constraint Template**
+
+```yaml
+apiVersion: templates.gatekeeper.sh/v1
+kind: ConstraintTemplate
+metadata:
+  name: k8srequiredresourcelimits
+spec:
+  crd:
+    spec:
+      names:
+        kind: K8sRequiredResourceLimits
+      validation:
+        openAPIV3Schema:
+          type: object
+          properties:
+            exemptImages:
+              type: array
+              items:
+                type: string
+  targets:
+  - target: admission.k8s.gatekeeper.sh
+    rego: |
+    package k8srequiredresourcelimits
+
+    violation[{"msg": msg}] {
+      container := input.review.object.spec.containers[_]
+      image := container.image
+      not image_is_exempt(image)
+      not container.resources.limits
+      msg := sprintf("Container %v must have resource limits", [container.name])
+    }
+
+    image_is_exempt(image) {
+      exempt_images := object.get(input, ["parameters", "exemptImages"], [])
+      exempt_images[_] == image
+    }
+```
+
+**Example: Creating a Constraint (Enforcement Rule)**
+
+```yaml
+apiVersion: constraints.gatekeeper.sh/v1beta1
+kind: K8sRequiredResourceLimits
+metadata:
+  name: require-resource-limits
+spec:
+  parameters:
+    exemptImages:
+      - "gcr.io/system-images/*"
+  match:
+    excludedNamespaces:
+      - "kube-system"
+      - "gatekeeper-system"
+    kinds:
+      - apiGroups: [""]
+        kinds: ["Pod"]
+      - apiGroups: ["apps"]
+        kinds: ["Deployment", "StatefulSet", "DaemonSet"]
+```
+
+**OPA Use Cases:**
+
+1. **Kubernetes Admission Control:** Enforce security, compliance, and best practices.
+2. **API Authorization:** Fine-grained access control for APIs.
+3. **CI/CD Pipelines:** Policy enforcement in deployment pipelines.
+4. **Cloud Infrastructure:** Policy enforcement for cloud resources (Terraform, CloudFormation).
+5. **Data Filtering:** Redact or filter sensitive data in responses.
+6. **Configuration Validation:** Validate configurations before deployment.
+
+**Gatekeeper Audit and Violations:**
+
+View policy violations with Gatekeeper's audit feature:
+
+```bash
+# View constraint violations
+kubectl get constraints
+
+# Describe a specific constraint
+kubectl describe k8srequiredresourcelimits require-resource-limits
+
+# View audit logs and violations
+kubectl logs -n gatekeeper-system deployment/gatekeeper-audit
+
+# Check if a pod would be allowed (dry-run)
+kubectl apply -f my-pod.yaml --dry-run=server
+```
+
+**OPA for Mutation (Automatic Fixes):**
+
+Gatekeeper can also mutate (modify) resources automatically using mutation rules:
+
+```yaml
+apiVersion: mutations.gatekeeper.sh/v1
+kind: Assign
+metadata:
+  name: add-default-namespace
+spec:
+  applyTo:
+  - groups: [""]
+    kinds: ["Pod"]
+    versions: ["v1"]
+  match:
+  excludedNamespaces: ["kube-system"]
+  location: "metadata.namespace"
+  parameters:
+  assign:
+    value: "default"
+```
+
+##### Container Sandboxes
+
+**Container sandboxes** are lightweight virtualization or isolation mechanisms that provide an additional layer of security between containerized applications and the host kernel. Unlike standard containers that share the kernel with the host, sandboxed containers use techniques like lightweight VMs, kernel isolation, or strict syscall filtering to prevent container escape and limit the impact of container compromise.
+
+**Why Container Sandboxes?**
+
+- **Enhanced Isolation:** Containers share the host kernel, making them vulnerable to kernel exploits and container escape attacks.
+- **Defense in Depth:** Sandboxes add an extra security layer beyond standard container isolation.
+- **Reduced Blast Radius:** If a container is compromised, the damage is limited to the sandbox environment.
+- **Compliance:** Meet stricter security requirements for multi-tenant or regulated environments.
+- **Kernel Protection:** Prevents malicious containers from directly attacking the host kernel.
+
+**Types of Container Sandboxes:**
+
+**1. Lightweight VMs (Hardware-Assisted Isolation)**
+
+These use minimal guest OS images running in hypervisors like KVM, QEMU, or Hyper-V. Each container gets its own lightweight VM with a dedicated kernel.
+
+**Examples:**
+- **Kata Containers:** Uses lightweight VMs (via QEMU or Cloud Hypervisor) to isolate each pod. Provides near-VM-level isolation with container-like performance and management.
+- **gVisor:** Google's container sandbox that intercepts and simulates syscalls instead of passing them to the host kernel. Acts as a guest kernel in userspace.
+- **Firecracker:** AWS's minimal hypervisor for ultra-lightweight VMs, powering AWS Lambda and Fargate.
+
+**Pros:**
+- Strong isolation guarantee
+- Protects host kernel from container exploits
+- Each container has its own kernel
+- Good for untrusted or multi-tenant workloads
+
+**Cons:**
+- Higher resource overhead than standard containers
+- Slower startup times
+- More memory per container
+- Performance overhead vs. native containers
+
+**2. Seccomp and AppArmor (Kernel-Level Filtering)**
+
+These restrict syscalls and capabilities at the kernel level without virtualization, providing lightweight sandboxing.
+
+- **seccomp:** Filters the syscalls a process can make (mode 2).
+- **AppArmor:** Restricts file access, capabilities, and network operations.
+- **SELinux:** Mandatory Access Control (MAC) enforcing strict policies.
+
+**Pros:**
+- Minimal performance overhead
+- Easy to implement and manage
+- Works with standard containers
+
+**Cons:**
+- Less isolation than VMs
+- Kernel still shared with host
+- Policies can be complex to configure
+
+**3. User Namespaces**
+
+Map container processes to non-root UIDs/GIDs on the host, preventing privilege escalation even if a container escapes.
+
+**Pros:**
+- Processes appear as non-root even if running as root inside the container
+- Limits damage if container is compromised
+
+**Cons:**
+- Does not prevent direct kernel access
+- Requires careful namespace mapping configuration
+
+**Container Runtimes with Sandbox Support:**
+
+**1. Kata Containers:**
+
+- Integrates with Kubernetes as a RuntimeClass
+- Automatically launches a lightweight VM per pod
+- Compatible with Docker, containerd, and CRI-O
+- Near-VM security with container performance
+
+**Installation and Usage:**
+
+```bash
+# Install Kata Containers
+sudo apt-get install kata-containers
+
+# Use Kata in Kubernetes via RuntimeClass
+kubectl create -f - <<EOF
+apiVersion: node.k8s.io/v1
+kind: RuntimeClass
+metadata:
+  name: kata
+handler: kata
+EOF
+
+# Schedule pod with Kata runtime
+kubectl apply -f - <<EOF
+apiVersion: v1
+kind: Pod
+metadata:
+  name: kata-sandbox-pod
+spec:
+  runtimeClassName: kata
+  containers:
+  - name: app
+    image: nginx:latest
+EOF
+```
+
+**2. gVisor:**
+
+![gVisor](images/gvisor.png)
+
+- User-space implementation of the Linux kernel
+- Two components: `sentry` and `gofer`. The sentry runs in userspace and intercepts syscalls, while the gofer handles file system access on behalf of the sentry.
+- Intercepts and handles syscalls in userspace
+- Processes run in an isolated userspace kernel
+- No hypervisor overhead; lower resource usage than full VMs
+- Limited syscall support; some applications may not work properly
+
+**Installation and Usage:**
+
+```bash
+# Install gVisor
+curl https://gvisor.dev/archive/latest/containerd-shim-runsc-v1.linux-amd64 -o /usr/local/bin/containerd-shim-runsc-v1
+chmod +x /usr/local/bin/containerd-shim-runsc-v1
+
+# Configure containerd with gVisor runtime
+cat >> /etc/containerd/config.toml <<EOF
+[plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runsc]
+  runtime_engine = ""
+  runtime_root = ""
+  runtime_type = "io.containerd.runsc.v1"
+EOF
+
+systemctl restart containerd
+
+# Use gVisor in Kubernetes via RuntimeClass
+kubectl create -f - <<EOF
+apiVersion: node.k8s.io/v1
+kind: RuntimeClass
+metadata:
+  name: gvisor
+handler: runsc
+EOF
+
+# Schedule pod with gVisor runtime
+kubectl apply -f - <<EOF
+apiVersion: v1
+kind: Pod
+metadata:
+  name: gvisor-sandbox-pod
+spec:
+  runtimeClassName: gvisor
+  containers:
+  - name: app
+    image: nginx:latest
+EOF
+```
+
+**3. Firecracker:**
+- Ultra-lightweight hypervisor for minimal VMs
+- Used by AWS Lambda and Fargate
+- Very fast boot times and low resource overhead
+- Limited Linux compatibility
+
+**Container Sandbox in Kubernetes:**
+
+Kubernetes uses **RuntimeClass** to specify which container runtime a pod should use. This enables mixing standard containers with sandboxed containers in the same cluster.
+
+**Example: RuntimeClass Configuration**
+
+```yaml
+apiVersion: node.k8s.io/v1
+kind: RuntimeClass
+metadata:
+  name: kata
+handler: kata                          # Points to kata runtime handler
+scheduling:
+  nodeSelector:
+    kata: "true"                       # Run on nodes with kata installed
+  tolerations:
+  - key: kata
+    operator: Equal
+    value: "true"
+    effect: NoSchedule
+---
+apiVersion: node.k8s.io/v1
+kind: RuntimeClass
+metadata:
+  name: gvisor
+handler: runsc                         # Points to gVisor runtime handler
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: secure-workload
+spec:
+  runtimeClassName: kata               # Use Kata Containers runtime
+  containers:
+  - name: secure-app
+    image: sensitive-app:latest
+```
+
+**Comparing Sandbox Options:**
+
+| Feature | Kata Containers | gVisor | Firecracker | Standard Container |
+|---------|-----------------|--------|-------------|-------------------|
+| Isolation | VM-level | Userspace kernel | VM-level | Kernel namespace |
+| Resource Overhead | Moderate-High | Low-Moderate | Very Low | Minimal |
+| Boot Time | ~100ms | ~10ms | ~10ms | <100μs |
+| Kernel Access | Isolated kernel | Simulated kernel | Isolated kernel | Shared kernel |
+| Kubernetes Support | RuntimeClass | RuntimeClass | Limited | Default |
+| Multi-tenant Safe | Excellent | Good | Excellent | Poor |
+| Untrusted Workloads | Suitable | Suitable | Suitable | Not recommended |
+| Performance Impact | 5-20% | 10-30% | 5-15% | Baseline |
+
+**Security Trade-offs:**
+
+1. **Kata Containers:**
+  - Best isolation; close to VM security
+  - Higher resource cost and complexity
+  - Good balance of security and performance
+
+2. **gVisor:**
+  - Good isolation without hypervisor overhead
+  - Some syscalls may be unimplemented or slow
+  - Lower resource footprint than Kata
+
+3. **Firecracker:**
+  - Best performance for ultra-lightweight VMs
+  - Very minimal resource footprint
+  - Good for serverless and FaaS workloads
+
+4. **Standard Containers + seccomp/AppArmor:**
+  - Lightweight and fast
+  - Kernel still shared; less isolation
+  - Suitable for trusted workloads only
+
+  ##### Container Runtimes
+
+  **Container runtimes** are the software responsible for creating, starting, stopping, and managing containers on a host system. They interface with the kernel's isolation features (namespaces, cgroups) to provide containerized environments. In Kubernetes, the kubelet uses Container Runtime Interface (CRI) to communicate with container runtimes.
+
+  **Role of Container Runtimes:**
+
+  - Create and manage container processes
+  - Set up namespaces and cgroup isolation
+  - Mount filesystems and manage container networking
+  - Enforce resource limits and security policies
+  - Handle container lifecycle (create, start, stop, delete)
+
+  **Container Runtime Levels:**
+
+  Container runtimes are typically organized into two levels:
+
+  1. **Low-Level Runtimes (OCI Runtimes):**
+    - Directly interact with kernel features to create and run containers
+    - Implement the Open Container Initiative (OCI) specification
+    - Examples: `runc`, `crun`, `kata`, `runsc` (gVisor)
+    - Typically invoked by higher-level runtimes
+
+  2. **High-Level Runtimes (Container Engines):**
+    - Manage container images, networking, and storage
+    - Use low-level runtimes to actually run containers
+    - Provide user-facing interfaces and APIs
+    - Examples: Docker, containerd, CRI-O, Podman
+
+  **Common Container Runtimes:**
+
+  ##### runc
+
+  **runc** is the standard, reference implementation of the OCI Container Runtime Specification. It is a lightweight, standalone tool that creates and runs OCI-compliant containers. runc is the default low-level runtime used by Docker, containerd, CRI-O, and Podman.
+
+  **Key Features:**
+
+  - Fully OCI-compliant
+  - Lightweight and minimal (small binary footprint)
+  - Direct kernel interaction via cgroups and namespaces
+  - Supports all container isolation features
+  - Used by most container ecosystems
+
+  **How runc Works:**
+
+  1. Takes an OCI bundle (config.json + rootfs directory)
+  2. Sets up namespaces and cgroups
+  3. Executes the container process
+  4. Manages the container lifecycle
+
+  **Common runc Commands:**
+
+  ```bash
+  # Create a container (does not start it)
+  runc create <container-id> --bundle /path/to/bundle
+
+  # Start a container
+  runc start <container-id>
+
+  # Run a container (create + start in one command)
+  runc run <container-id> --bundle /path/to/bundle
+
+  # List containers
+  runc list
+
+  # Get container state
+  runc state <container-id>
+
+  # Stop/kill a container
+  runc kill <container-id>
+
+  # Delete a container
+  runc delete <container-id>
+
+  # Execute a command in a container
+  runc exec <container-id> <command>
+
+  # Pause a container
+  runc pause <container-id>
+
+  # Resume a paused container
+  runc resume <container-id>
+  ```
+
+  **OCI Bundle Structure:**
+
+  ```
+  bundle/
+  ├── config.json       # Container configuration (OCI spec)
+  └── rootfs/          # Root filesystem for the container
+      ├── bin/
+      ├── etc/
+      ├── lib/
+      └── ...
+  ```
+
+  **config.json Example:**
+
+  ```json
+  {
+    "ociVersion": "1.0.0",
+    "process": {
+      "terminal": false,
+      "user": {
+        "uid": 0,
+        "gid": 0
+      },
+      "args": ["/bin/sh"],
+      "env": ["PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"]
+    },
+    "root": {
+      "path": "rootfs",
+      "readonly": false
+    },
+    "hostname": "container",
+    "linux": {
+      "namespaces": [
+        {"type": "pid"},
+        {"type": "ipc"},
+        {"type": "uts"},
+        {"type": "mount"},
+        {"type": "network"}
+      ],
+      "cgroups": {
+        "path": "/docker/container-id"
+      },
+      "resources": {
+        "memory": {
+          "limit": 1073741824
+        },
+        "cpu": {
+          "quota": 100000,
+          "period": 100000
+        }
+      }
+    }
+  }
+  ```
+
+  ##### containerd
+
+  **containerd** is a high-level container runtime that manages the complete container lifecycle. It abstracts away the complexity of working with low-level runtimes like runc, providing a simple, stable API for container management. containerd is widely used in Kubernetes clusters and is the default container runtime in many Kubernetes distributions.
+
+  **Key Features:**
+
+  - OCI-compliant image and runtime support
+  - Manages container images (pull, push, store)
+  - Manages container networking and storage
+  - gRPC-based API for programmatic access
+  - Daemon-based architecture (runs as a service)
+  - CRI plugin for Kubernetes integration
+  - Support for multiple runtimes (runc, kata, gVisor)
+  - Lower memory footprint than Docker
+  - No dependency on Docker daemon
+
+  **Architecture:**
+
+  ```
+  Kubernetes → kubelet → CRI → containerd → runc → kernel
+  ```
+
+  **Common containerd Commands:**
+
+  ```bash
+  # Pull an image
+  ctr images pull docker.io/library/nginx:latest
+
+  # List images
+  ctr images list
+
+  # Run a container
+  ctr run docker.io/library/nginx:latest nginx-container
+
+  # List containers
+  ctr containers list
+
+  # Get container info
+  ctr containers info <container-id>
+
+  # Execute a command in a container
+  ctr tasks exec -t <container-id> <command>
+
+  # Kill a task
+  ctr tasks kill <container-id>
+
+  # List tasks (running containers)
+  ctr tasks list
+
+  # Delete a container
+  ctr containers delete <container-id>
+
+  # Push an image
+  ctr images push docker.io/library/my-image:latest
+
+  # Tag an image
+  ctr images tag source:tag target:tag
+
+  # Inspect image content
+  ctr images info <image-name>
+  ```
+
+  ##### One-Way SSL vs Mutual TLS (mTLS)
+
+  **One-Way SSL (TLS):**
+
+  One-way SSL, also called server authentication, is the most common form of TLS where only the server presents a certificate to the client for authentication. The client verifies the server's certificate but does not provide one in return.
+
+  **How One-Way SSL Works:**
+
+  1. Client initiates a connection to the server.
+  2. Server responds with its X.509 certificate signed by a Certificate Authority (CA).
+  3. Client verifies the server's certificate against trusted CAs in its certificate store.
+  4. If valid, the client establishes an encrypted connection with the server.
+  5. Client and server exchange data over the encrypted channel.
+
+  **Use Cases:**
+
+  - Standard HTTPS websites and APIs
+  - Client-server communication where server identity is critical but client identity is not
+  - Public-facing services (e.g., web applications, APIs)
+  - Most internet traffic
+
+  **Security Properties:**
+
+  - Server identity verified
+  - Encryption enabled
+  - Client identity not verified by certificate (authentication happens via passwords, tokens, etc.)
+  - Vulnerable to man-in-the-middle attacks if client doesn't properly validate the certificate
+
+  **Mutual TLS (mTLS):**
+
+  Mutual TLS, also called two-way TLS or client-server authentication, requires both the client and server to present and verify certificates. Both parties authenticate each other before establishing the connection.
+
+  **How mTLS Works:**
+
+  1. Client initiates a connection to the server.
+  2. Server presents its certificate; client verifies it.
+  3. Server requests the client's certificate.
+  4. Client presents its certificate; server verifies it.
+  5. Both parties validate each other's certificates against trusted CAs.
+  6. If both are valid, an encrypted connection is established.
+  7. Client and server exchange data over the encrypted channel.
+
+  **Use Cases:**
+
+  - Kubernetes control plane and kubelet communication
+  - Service-to-service communication in microservices
+  - API gateway to backend services
+  - High-security internal communication (database replication, etcd clustering)
+  - Zero-trust network architectures
+  - Inter-node communication in distributed systems
+
+  **Security Properties:**
+
+  - Server identity verified
+  - Client identity verified
+  - Encryption enabled
+  - Bidirectional authentication ensures both parties are who they claim to be
+  - Prevents unauthorized clients from accessing services
+  - Best protection against man-in-the-middle attacks
+
+  **Comparison Table:**
+
+  | Aspect | One-Way SSL | mTLS |
+  |--------|------------|------|
+  | Server Authentication | ✓ | ✓ |
+  | Client Authentication | ✗ | ✓ |
+  | Certificate Exchange | Server only | Both client & server |
+  | Use Case | Public APIs, websites | Internal services, zero-trust |
+  | Complexity | Simple | More complex |
+  | Certificate Management | Easier | More overhead (client certs) |
+  | Performance Impact | Minimal | Minimal (negligible) |
+  | Security Level | Good | Excellent |
+
+  **Kubernetes mTLS Example:**
+
+  In Kubernetes, mTLS is used extensively:
+
+  ```yaml
+  # Pod mounting client certificate for API server communication
+  apiVersion: v1
+  kind: Pod
+  metadata:
+    name: mtls-client
+  spec:
+    containers:
+    - name: app
+      image: nginx:latest
+      volumeMounts:
+      - name: client-cert
+        mountPath: /etc/client-certs
+        readOnly: true
+    volumes:
+    - name: client-cert
+      secret:
+        secretName: client-certificate
+        defaultMode: 0400
+  ```
+
+  Service mesh implementations like Istio use automatic mTLS to secure all pod-to-pod communication without requiring application-level changes.
+
+##### Multi Tenancy in Kubernetes
+
+**Multi-Tenancy in Kubernetes** is an architecture pattern where a single Kubernetes cluster is shared among multiple tenants (teams, applications, organizations). Each tenant has isolated resources, access controls, and workloads while sharing the underlying cluster infrastructure, reducing costs and operational overhead. It mainly comes down to Compute, Storage, and Network isolation.
+
+**Why Multi-Tenancy?**
+
+- **Cost Efficiency:** Share cluster resources among multiple teams or projects
+- **Simplified Management:** Single cluster to manage instead of one per tenant
+- **Resource Optimization:** Better utilization of hardware resources
+- **Operational Efficiency:** Fewer clusters to patch, upgrade, and monitor
+
+**Multi-Tenancy Models:**
+
+**1. Namespace-based Multi-Tenancy:**
+
+Tenants are isolated using Kubernetes namespaces. Each tenant gets one or more namespaces where their workloads run. This is the most common and easiest to implement approach.
+
+**Isolation Mechanisms:**
+
+- **RBAC:** Role-based access control ensures tenants can only access their own resources
+- **Network Policies:** Prevent cross-tenant traffic by default
+- **Resource Quotas:** Limit resource consumption per tenant namespace
+- **Pod Security Standards:** Enforce security policies per namespace
+- **Storage Isolation:** Separate PersistentVolumes and StorageClasses per tenant
+
+**Example Namespace Setup:**
+
+```yaml
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: tenant-a
+  labels:
+    tenant: tenant-a
+    pod-security.kubernetes.io/enforce: restricted
+---
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: tenant-a-quota
+  namespace: tenant-a
+spec:
+  hard:
+    requests.cpu: "10"
+    requests.memory: "20Gi"
+    limits.cpu: "20"
+    limits.memory: "40Gi"
+    pods: "100"
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: tenant-a-isolation
+  namespace: tenant-a
+spec:
+  podSelector: {}
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          tenant: tenant-a
+  egress:
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          tenant: tenant-a
+  - to:
+    - namespaceSelector: {}
+    ports:
+    - protocol: TCP
+      port: 53                    # DNS access
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: tenant-a-admin
+  namespace: tenant-a
+rules:
+- apiGroups: [""]
+  resources: ["pods", "services", "configmaps"]
+  verbs: ["get", "list", "create", "update", "delete"]
+- apiGroups: ["apps"]
+  resources: ["deployments", "statefulsets"]
+  verbs: ["get", "list", "create", "update", "delete"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: tenant-a-admin-binding
+  namespace: tenant-a
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: tenant-a-admin
+subjects:
+- kind: Group
+  name: tenant-a-admins
+  apiGroup: rbac.authorization.k8s.io
+```
+
+**2. Cluster-based Multi-Tenancy:**
+
+Each tenant gets a dedicated cluster. Provides stronger isolation but higher operational and infrastructure costs.
+
+**Pros:**
+- Complete isolation between tenants
+- No noisy neighbor problems
+- Easier security compliance per tenant
+- Stronger blast radius containment
+
+**Cons:**
+- Higher infrastructure costs
+- More operational overhead
+- Duplication of cluster components
+- Less efficient resource utilization
+
+**3. Virtual Cluster Multi-Tenancy:**
+
+Using tools like **vCluster** to create lightweight virtual clusters on top of a single physical cluster. Each virtual cluster has its own control plane but shares the underlying node infrastructure.
+
+**Example with vCluster:**
+
+```bash
+# Create a virtual cluster for tenant-a
+vcluster create tenant-a --namespace tenant-a-vcluster
+
+# Create a virtual cluster for tenant-b
+vcluster create tenant-b --namespace tenant-b-vcluster
+
+# Each virtual cluster has isolated API server and controller manager
+# But shares physical nodes for pod scheduling
+```
+
+**Multi-Tenancy Best Practices:**
+
+**1. Resource Isolation:**
+
+```yaml
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: tenant-limits
+  namespace: tenant-a
+spec:
+  limits:
+  - max:
+      cpu: "2"
+      memory: "2Gi"
+    min:
+      cpu: "100m"
+      memory: "128Mi"
+    default:
+      cpu: "500m"
+      memory: "512Mi"
+    defaultRequest:
+      cpu: "250m"
+      memory: "256Mi"
+    type: Container
+```
+
+**2. RBAC per Tenant:**
+
+Ensure tenants can only access their own resources and namespaces.
+
+```yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: tenant-viewer
+rules:
+- apiGroups: [""]
+  resources: ["namespaces"]
+  verbs: ["get", "list"]
+  resourceNames: ["tenant-a"]      # Restrict to specific namespace
+- apiGroups: [""]
+  resources: ["pods", "services"]
+  verbs: ["get", "list"]
+```
+
+**3. Network Policies:**
+
+Enforce network segmentation between tenants by default.
+
+```yaml
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: deny-cross-tenant
+  namespace: tenant-a
+spec:
+  podSelector: {}
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - from:
+    - podSelector: {}              # Allow only from same namespace
+  egress:
+  - to:
+    - podSelector: {}              # Allow only to same namespace
+  - to:                            # Exception: allow DNS
+    - namespaceSelector: {}
+    ports:
+    - protocol: UDP
+      port: 53
+```
+
+**4. Pod Security Standards:**
+
+Apply security policies per tenant namespace.
+
+```bash
+kubectl label namespace tenant-a \
+  pod-security.kubernetes.io/enforce=restricted \
+  pod-security.kubernetes.io/audit=restricted \
+  pod-security.kubernetes.io/warn=restricted
+```
+
+**5. Storage Isolation:**
+
+Separate storage classes and persistent volumes per tenant.
+
+```yaml
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: tenant-a-storage
+provisioner: pd.csi.storage.gke.io
+parameters:
+  type: pd-ssd
+  replication-type: regional-pd
+allowVolumeExpansion: true
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: tenant-a-data
+  namespace: tenant-a
+spec:
+  accessModes:
+  - ReadWriteOnce
+  storageClassName: tenant-a-storage
+  resources:
+    requests:
+      storage: 10Gi
+```
+
+**6. Monitoring and Logging Isolation:**
+
+Use label selectors to isolate monitoring and logging per tenant.
+
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-config
+  namespace: monitoring
+data:
+  prometheus.yml: |
+    global:
+      scrape_interval: 15s
+    scrape_configs:
+    - job_name: 'tenant-a'
+      kubernetes_sd_configs:
+      - role: pod
+        namespaces:
+          names:
+          - tenant-a
+      relabel_configs:
+      - source_labels: [__meta_kubernetes_namespace]
+        target_label: namespace
+```
+
+**Multi-Tenancy Implementation Tools:**
+
+1. **Namespace-based:** Native Kubernetes features (RBAC, NetworkPolicy, ResourceQuota)
+2. **Policy Enforcement:** OPA/Gatekeeper, Kyverno
+3. **Virtual Clusters:** vCluster, Capsule
+4. **Service Mesh:** Istio (for network policy and mTLS)
+5. **Monitoring:** Prometheus + Grafana with label filtering
+
+**Challenges in Multi-Tenancy:**
+
+1. **Noisy Neighbor Problem:** One tenant's workload consuming resources affects others
+   - Solution: Resource quotas, LimitRange, Pod QoS classes
+
+2. **Security Isolation:** Kernel exploits could affect all tenants
+   - Solution: Container sandboxes (Kata, gVisor), strict Pod Security Standards
+
+3. **Data Isolation:** Accidental data access across tenants
+   - Solution: RBAC, network policies, encryption at rest
+
+4. **Cost Attribution:** Tracking costs per tenant
+   - Solution: Label all resources with tenant identifier, use cloud billing integration
+
+5. **Compliance:** Meeting isolation requirements for regulated tenants
+   - Solution: Cluster-based multi-tenancy or virtual clusters for strict requirements
+
+**Types of Isolation in Multi-Tenancy:**
+
+1. **Control Plane Isolation:** Namespaces, RBAC, and resource quotas.
+
+2. **Data Plane Isolation:** Network policies, storage classes, and taints/tolerations (node pools).
+
+**API Access Control:**
+
+**API Priority and Fairness:** Kubernetes API server can be configured to prioritize requests from certain tenants, ensuring critical workloads get API access during high load.
+
+You can configure it using the `PriorityLevelConfiguration` resource:
+
+```yaml
+apiVersion: flowcontrol.apiserver.k8s.io/v1beta1
+kind: PriorityLevelConfiguration
+metadata:
+  name: tenant-a-priority
+spec:
+  type: limited
+  limited:
+    assuredConcurrencyShares: 100
+```
+
+and the `FlowSchema` resource to bind it to specific users or groups:
+
+```yaml
+apiVersion: flowcontrol.apiserver.k8s.io/v1beta1
+kind: FlowSchema
+metadata:
+  name: tenant-a-flow
+spec:
+  priorityLevelConfiguration:
+    name: tenant-a-priority
+  rules:
+  - subjects:
+    - kind: Group
+      name: tenant-a-users
+      apiGroup: rbac.authorization.k8s.io
+    resourceRules:
+    - verbs: ["*"]
+      apiGroups: ["*"]
+      resources: ["*"]
+```
+
+**Multi Tenant DNS:**
+
+Use CoreDNS with custom configuration to provide tenant-specific DNS resolution. You can configure CoreDNS to only resolve names within a tenant's namespace, which helps prevent cross-tenant service discovery. Even with network policies in place, this adds an additional layer of isolation by ensuring tenants cannot easily discover services in other namespaces.
+
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: coredns
+  namespace: kube-system
+data:
+  Corefile: |
+    # Tenant-specific namespace zone — resolved first
+    tenant-a.svc.cluster.local:53 {
+      kubernetes cluster.local {
+        namespaces tenant-a
+        fallthrough
+      }
+      forward . /etc/resolv.conf
+      cache 30
+      errors
+      log
+    }
+
+    # Default catch-all zone
+    .:53 {
+      errors
+      health
+      ready
+      kubernetes cluster.local in-addr.arpa ip6.arpa {
+        pods insecure
+        fallthrough in-addr.arpa ip6.arpa
+      }
+      forward . /etc/resolv.conf
+      cache 30
+      loop
+      reload
+      loadbalance
+    }
+```
+#### Supply Chain Security
+
+Supply chain security in Kubernetes focuses on securing the entire lifecycle of software development, from code creation to deployment. It involves ensuring that all components of the software supply chain, including source code, dependencies, build processes, and deployment pipelines, are secure and free from vulnerabilities.
+
+##### SBOM
+
+A **Software Bill of Materials (SBOM)** is a comprehensive inventory of all components, libraries, and dependencies used in a software application. It provides detailed information about the software's composition, including the versions of each component, their sources, and any known vulnerabilities. SBOMs are crucial for supply chain security as they enable organizations to track and manage the components in their software, identify vulnerabilities, and ensure compliance with security standards.
+
+**SBOM Formats:**
+
+- **CycloneDX:** A lightweight SBOM format designed for software supply chain security.
+- **SPDX:** A widely adopted (standard) SBOM format that provides detailed information about software components and their licenses.
+
+**SBOM Workflow:**
+
+1. **Generation:** SBOMs are generated during the build process using tools like Syft, CycloneDX CLI, or SPDX tools.
+2. **Storage:** SBOMs are stored in a secure repository or artifact registry alongside the built artifacts.
+3. **Analysis:** SBOMs are analyzed for vulnerabilities using tools like Snyk, Trivy, or OSS Index.
+4. **Remediation:** If vulnerabilities are found, developers can update dependencies, apply patches, or take other remediation actions based on the SBOM analysis.
+5. **Monitoring:** Continuously monitor for new vulnerabilities in the components listed in the SBOM and update accordingly.
+
+**Example SBOM Generation with Syft:**
+
+```bash
+# Generate an SBOM for a Docker image
+syft my-app:latest -o cyclonedx-json > sbom.json
+```
+
+**Example SBOM Generation with bom:**
+
+```bash
+# Generate an SBOM for a project directory
+bom -d /path/to/project -o spdx-json > sbom.spdx.json
+```
+
+##### KubeLinter
+
+**KubeLinter** is a static analysis tool designed to identify misconfigurations and security issues in Kubernetes YAML manifests. It helps developers and operators ensure that their Kubernetes resources adhere to best practices and security standards before deployment.
+
+**Usage:**
+
+```bash
+kube-linter lint /path/to/manifests
+```
+
+##### Trivy
+
+**Trivy** is a comprehensive vulnerability scanner for container images, file systems, and Git repositories. It detects vulnerabilities in OS packages, application dependencies, and configuration files, making it an essential tool for supply chain security in Kubernetes.
+
+**Usage:**
+
+```bash
+# Scan a Docker image for vulnerabilities
+trivy image my-app:latest
+# Scan a file system for vulnerabilities
+trivy fs /path/to/filesystem
+# Scan a Git repository for vulnerabilities
+trivy repo
+```
+
+#### Monitoring, Logging, and Runtime Security
+
+##### Falco
+
+**Falco** is an open-source runtime security tool for Kubernetes and cloud-native environments. It monitors system calls and Kubernetes events in real time to detect unexpected behavior, suspicious activity, and potential security threats. Falco uses rules to define what constitutes abnormal activity (e.g., shell in a container, changes to sensitive files, privilege escalation) and generates alerts when violations occur.
+
+**Key Features:**
+- Real-time detection of anomalous behavior in containers, pods, and nodes.
+- Uses kernel-level syscall monitoring (via eBPF or kernel modules).
+- Integrates with Kubernetes to enrich alerts with pod, namespace, and label information.
+- Highly customizable rules for security, compliance, and operational monitoring.
+- Supports alerting via logging, webhooks, Slack, and other integrations.
+
+**Example Falco Rule:**
+```yaml
+- rule: Terminal shell in container
+  desc: Detects interactive shell sessions in containers
+  condition: container and shell and not user_known_shell
+  output: "Terminal shell spawned in container (user=%user.name command=%proc.cmdline container=%container.id image=%container.image.repository)"
+  priority: WARNING
+```
+
+**Typical Use Cases:**
+- Detecting exec into containers (possible intrusion).
+- Monitoring file changes in sensitive directories.
+- Alerting on privilege escalation or suspicious network activity.
+- Compliance monitoring for regulated environments.
+
+**Installation:**
+- As a DaemonSet in Kubernetes:  
+  `kubectl apply -f https://raw.githubusercontent.com/falcosecurity/falco/master/deploy/kubernetes/falco-daemonset.yaml`
+- As a standalone agent on Linux hosts.
+
+**Falco rules:**
+
+Falco rules define what behaviors are considered suspicious or anomalous in your Kubernetes cluster or Linux hosts. Each rule consists of a condition (what to match), an output (alert message), and a priority (severity level).
+
+**Rule Structure:**
+```yaml
+- rule: <rule-name>
+  desc: <description>
+  condition: <filter expression>
+  output: <alert message>
+  priority: <severity>
+```
+
+**Conditions:**  
+Conditions are logical expressions based on system calls, process information, container context, user actions, and more. Falco provides built-in fields like `container`, `shell`, `user.name`, `proc.cmdline`, `file.name`, etc.
+
+**Examples:**
+- Detect shell execution in a container:
+  ```yaml
+  condition: container and shell
+  ```
+- Detect file changes in `/etc`:
+  ```yaml
+  condition: open_write and file.name startswith /etc/
+  ```
+- Detect privilege escalation:
+  ```yaml
+  condition: evt.type=execve and user.uid != 0 and proc.name=su
+  ```
+
+**Output:**  
+Customizable alert messages with placeholders for dynamic values:
+```yaml
+output: "Shell spawned in container (user=%user.name command=%proc.cmdline container=%container.id image=%container.image.repository)"
+```
+
+**Priority Levels:**
+- `EMERGENCY`
+- `ALERT`
+- `CRITICAL`
+- `ERROR`
+- `WARNING`
+- `NOTICE`
+- `INFO`
+- `DEBUG`
+
+**Custom Rules:**  
+You can add your own rules to `/etc/falco/falco_rules.local.yaml` or extend built-in rules. For example, to alert on any process running as root:
+```yaml
+- rule: Run as root
+  desc: Detect processes running as root user
+  condition: user.uid=0
+  output: "Process running as root (command=%proc.cmdline user=%user.name)"
+  priority: WARNING
+```
+
+**Rule Management:**
+- Built-in rules: `/etc/falco/falco_rules.yaml`. You should not modify this file directly as it may be overwritten during updates.
+- Custom rules: `/etc/falco/falco_rules.local.yaml`
+- Rules can be enabled, disabled, or tuned for your environment.
+- Use `falco --list` to list all rules.
+
+##### Immutable Infrastructure
+
+**Immutable Infrastructure** is a DevOps and cloud-native practice where infrastructure components (servers, containers, configurations) are never modified after deployment. Instead of updating or patching existing systems, you replace them entirely with new versions. This approach improves reliability, security, and reproducibility by eliminating configuration drift and ensuring consistent deployments.
+
+**Key Principles:**
+
+1. **Never Modify After Deployment:** Once deployed, infrastructure is treated as immutable. No SSH access for manual changes, no runtime patches, no in-place updates.
+2. **Version Everything:** Every change results in a new version of the infrastructure component (container image, machine image, configuration).
+3. **Replace, Don't Update:** When changes are needed, deploy new infrastructure and retire the old.
+4. **Infrastructure as Code:** All infrastructure configuration is defined in code, version-controlled, and reproducible.
+
+**Benefits:**
+
+- **Consistency:** Every deployment is identical; no configuration drift between environments.
+- **Reliability:** Eliminates issues from manual changes or incomplete deployments.
+- **Security:** Reduces attack surface by preventing runtime modifications and unauthorized access.
+- **Faster Recovery:** Quickly redeploy known-good versions if issues arise.
+- **Easier Rollbacks:** Simply redeploy a previous version without complex rollback procedures.
+- **Compliance:** All changes are auditable and traceable through version control.
+- **Scalability:** New instances are guaranteed to have the same configuration.
+
+**Implementation in Kubernetes:**
+
+Kubernetes is inherently designed around immutable infrastructure principles:
+
+1. **Container Images:**
+  - Each container image is immutable; changes result in a new image with a new tag.
+  - Deployments specify exact image versions (never use `latest`).
+  - New deployments pull the new image; old pods are replaced.
+
+2. **Pod Disruption Budgets:**
+  - Control how many pods can be unavailable during updates.
+  - Enable safe rolling updates without manual intervention.
+  ```yaml
+  apiVersion: policy/v1
+  kind: PodDisruptionBudget
+  metadata:
+    name: app-pdb
+  spec:
+    minAvailable: 2
+    selector:
+     matchLabels:
+      app: my-app
+  ```
+
+3. **Immutable ConfigMaps and Secrets:**
+  - Mark ConfigMaps and Secrets as immutable to prevent accidental modifications.
+  ```yaml
+  apiVersion: v1
+  kind: ConfigMap
+  metadata:
+    name: app-config
+  immutable: true
+  data:
+    config.yaml: |
+     debug: false
+  ```
+
+4. **Read-Only Root Filesystem:**
+  - Configure containers with read-only root filesystems to prevent runtime modifications.
+  ```yaml
+  apiVersion: v1
+  kind: Pod
+  metadata:
+    name: read-only-pod
+  spec:
+    containers:
+    - name: app
+     image: my-app:v1.2.3
+     securityContext:
+      readOnlyRootFilesystem: true
+     volumeMounts:
+     - name: tmp
+      mountPath: /tmp
+    volumes:
+    - name: tmp
+     emptyDir: {}
+  ```
+
+5. **No Manual Changes:**
+  - Disable SSH or limit access to nodes.
+  - Use admission controllers to prevent runtime modifications.
+  - All changes go through GitOps workflows (e.g., ArgoCD, Flux).
+
+**Tools for Immutable Infrastructure:**
+
+- **Packer:** Build immutable machine images (for VMs).
+- **Kaniko/Buildah:** Build container images without Docker daemon.
+- **Clair/Trivy:** Scan images for vulnerabilities before deployment.
+- **ArgoCD/Flux:** GitOps tools for immutable deployments.
+- **Renovate/Dependabot:** Automatically update dependencies and image tags in version control.
+- **Kyverno/OPA:** Admission controllers to enforce immutable infrastructure policies.
+
+##### Kubernetes Auditing
+
+**Kubernetes Auditing** is a capability that logs requests submitted to the Kubernetes API server, allowing you to track and monitor all API activity within your cluster. Auditing is essential for security, compliance, debugging, and forensic analysis. Every request to the API server can be logged with details about who performed the action, what was changed, and when it occurred.
+
+**Why Kubernetes Auditing?**
+
+- **Security Monitoring:** Track suspicious API activity and potential unauthorized access attempts.
+- **Compliance:** Meet regulatory requirements (HIPAA, PCI-DSS, SOC 2) by maintaining audit logs.
+- **Forensics:** Investigate security incidents by examining historical API changes.
+- **Debugging:** Troubleshoot issues by understanding what API calls were made and by whom.
+- **Accountability:** Maintain a complete audit trail of all cluster changes for auditing purposes.
+
+**Audit Log Contents:**
+
+Each audit log entry includes:
+- **RequestReceivedTimestamp:** When the request was received by the API server.
+- **User:** Information about the user or service account that made the request.
+- **ImpersonatedUser:** If impersonation was used.
+- **SourceIPs:** Source IP address(es) of the request.
+- **Verb:** The API operation (create, update, delete, get, list, watch, etc.).
+- **ObjectRef:** The resource being accessed (pod, deployment, secret, etc.).
+- **RequestObject:** The full object sent in the request (for mutations like create, update, patch).
+- **ResponseStatus:** The HTTP status code returned by the API server.
+- **ResponseObject:** The object returned by the API server (for read operations).
+- **RequestURI:** The full API endpoint and query string.
+- **UserAgent:** The user agent of the client making the request.
+- **Annotations:** Custom annotations added by admission controllers or audit policies.
+
+**Enabling Audit Logging:**
+
+Audit logging is configured on the kube-apiserver via the `--audit-policy-file` and `--audit-log-*` flags.
+
+**1. Create an Audit Policy File:**
+
+The audit policy file defines which events should be logged and at what level of detail. Save it as `/etc/kubernetes/audit-policy.yaml`:
+
+```yaml
+apiVersion: audit.k8s.io/v1
+kind: Policy
+# Log all requests at the Metadata level
+rules:
+# Metadata level logs request/response headers but not the bodies
+- level: Metadata
+  omitStages:
+  - RequestReceived
+
+# Log pod exec at RequestResponse level (includes full request/response)
+- level: RequestResponse
+  verbs: ["create"]
+  resources:
+  - group: ""
+    resources: ["pods/exec", "pods/portforward"]
+
+# Log secret reads at RequestResponse level
+- level: RequestResponse
+  verbs: ["get", "list"]
+  resources:
+  - group: ""
+    resources: ["secrets"]
+  omitStages:
+  - RequestReceived
+
+# Log namespace deletions at RequestResponse level
+- level: RequestResponse
+  verbs: ["delete"]
+  resources:
+  - group: ""
+    resources: ["namespaces"]
+
+# Log all RBAC changes at RequestResponse level
+- level: RequestResponse
+  verbs: ["create", "update", "patch", "delete"]
+  resources:
+  - group: "rbac.authorization.k8s.io"
+    resources: ["clusterroles", "clusterrolebindings", "roles", "rolebindings"]
+
+# Log failed authentication attempts at Warning level
+- level: Warning
+  omitStages:
+  - RequestReceived
+  userGroups: ["system:unauthenticated"]
+
+# Log ConfigMap and Secret updates at Metadata level
+- level: Metadata
+  verbs: ["update", "patch", "create", "delete"]
+  resources:
+  - group: ""
+    resources: ["configmaps", "secrets"]
+
+# Catch-all rule: log everything at Metadata level
+- level: Metadata
+  omitStages:
+  - RequestReceived
+```
+
+**Audit Policy Levels:**
+
+- **None:** Do not log events matching this rule.
+- **Metadata:** Log request metadata (user, timestamp, resource) but not request/response bodies.
+- **Request:** Log request metadata and body but not response.
+- **RequestResponse:** Log request and response metadata and bodies.
+
+**OmitStages:**
+
+- **RequestReceived:** Log the initial receipt of the request (rarely used, reduces log volume).
+- **ResponseStarted:** Log when the response begins to be sent.
+- **ResponseComplete:** Log when the response is complete.
+
+**2. Configure kube-apiserver:**
+
+Update the kube-apiserver manifest (`/etc/kubernetes/manifests/kube-apiserver.yaml`) to enable audit logging:
+
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: kube-apiserver
+  namespace: kube-system
+spec:
+  containers:
+  - name: kube-apiserver
+    image: k8s.gcr.io/kube-apiserver:vX.Y.Z
+    command:
+    - kube-apiserver
+    # ... other flags ...
+    # Enable audit logging
+    - --audit-policy-file=/etc/kubernetes/audit-policy.yaml
+    - --audit-log-maxage=30                          # Rotate logs after 30 days
+    - --audit-log-maxbackup=10                       # Keep 10 backup log files
+    - --audit-log-maxsize=100                        # Rotate logs at 100MB size
+    - --audit-log-path=/var/log/kubernetes/audit.log # Log file location
+    # Optional: Log to webhook (send to external service)
+    # - --audit-webhook-config-file=/etc/kubernetes/audit-webhook.yaml
+    # - --audit-webhook-mode=batch
+    # - --audit-webhook-batch-max-size=100
+    volumeMounts:
+    - name: audit
+      mountPath: /etc/kubernetes
+      readOnly: true
+    - name: audit-log
+      mountPath: /var/log/kubernetes
+  volumes:
+  - name: audit
+    hostPath:
+      path: /etc/kubernetes
+      type: Directory
+  - name: audit-log
+    hostPath:
+      path: /var/log/kubernetes
+      type: DirectoryOrCreate
+```
+
+**Audit Webhook (Log to External Service):**
+
+Instead of (or in addition to) writing logs to a file, you can send audit events to an external service (webhook).
+
+**1. Create Webhook Configuration:**
+
+Save as `/etc/kubernetes/audit-webhook.yaml`:
+
+```yaml
+apiVersion: v1
+kind: Config
+clusters:
+- name: falco
+  cluster:
+    server: http://falco-service:8765/k8s-audit
+contexts:
+- context:
+    cluster: falco
+    user: ""
+  name: default-context
+current-context: default-context
+preferences: {}
+users: []
+```
+
+**2. Update kube-apiserver:**
+
+```yaml
+- --audit-webhook-config-file=/etc/kubernetes/audit-webhook.yaml
+- --audit-webhook-mode=batch                       # Batch mode for efficiency
+- --audit-webhook-batch-max-size=100               # Max events per batch
+- --audit-webhook-batch-max-wait=5s                # Max time to wait before sending batch
+```
+
+**3. Webhook Receiver:**
+
+The webhook service must accept POST requests with audit events in JSON format.
+
+**Audit Log Analysis and Tools:**
+
+**1. Manual Analysis with jq:**
+
+```bash
+# Count API calls by user
+cat /var/log/kubernetes/audit.log | jq -r '.user.username' | sort | uniq -c
+
+# Find all failed authentication attempts
+cat /var/log/kubernetes/audit.log | jq 'select(.user.username == "system:unauthenticated" and .responseStatus.code == 401)'
+
+# Track all resource deletions
+cat /var/log/kubernetes/audit.log | jq 'select(.verb == "delete")'
+
+# Find all exec commands into pods
+cat /var/log/kubernetes/audit.log | jq 'select(.verb == "create" and .objectRef.resource == "pods/exec")'
+```
+
+**2. Using Falco for Audit Log Analysis:**
+
+Falco can consume Kubernetes audit logs and generate alerts based on suspicious patterns:
+
+```yaml
+# Configure Falco to read audit logs
+- rule: Pod exec detected
+  desc: Detect exec into pods
+  condition: k8s_audit and ka.verb == "create" and ka.target.resource == "pods/exec"
+  output: "Pod exec detected (user=%ka.user.name pod=%ka.target.name namespace=%ka.target.namespace)"
+  priority: WARNING
+```
+
+**3. Export to External Systems:**
+
+- **ELK Stack (Elasticsearch, Logstash, Kibana):** Store and visualize audit logs.
+- **Loki:** Send audit logs to Grafana Loki for querying and visualization.
+- **Prometheus:** Expose audit metrics (with custom tooling).
+
+**Done with CKS Material!**
